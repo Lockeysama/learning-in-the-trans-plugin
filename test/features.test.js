@@ -12,7 +12,7 @@ import {
   wordsForDisplay,
 } from "../extension/shared/lexicon-view.js";
 import { eventFromWidget, initialViewMode, isAutoLearnHost, isSiteEnabled, pageHost, shouldAutoLearnPage } from "../extension/shared/site.js";
-import { shouldQueueMessage } from "../extension/shared/messages.js";
+import { explainRuntimeError, shouldQueueMessage } from "../extension/shared/messages.js";
 import { mergePrompts, promptOverrides, DEFAULT_PROMPTS, validatePrompts } from "../extension/shared/prompts.js";
 import { fallbackIfSkipped, pickFrameResult } from "../extension/shared/tab-bridge.js";
 import { DEFAULT_GLOSS_STYLE, glossStyleToCss, normalizeGlossStyle } from "../extension/shared/gloss-style.js";
@@ -504,6 +504,14 @@ test("draft and lexicon reads are not queued behind model calls", () => {
   assert.equal(shouldQueueMessage("GET_LEXICON"), false);
   assert.equal(shouldQueueMessage("GET_STATE"), false);
   assert.equal(shouldQueueMessage("GLOSS"), true);
+});
+
+test("stale extension context asks the user to refresh", () => {
+  assert.equal(
+    explainRuntimeError({ message: "Extension context invalidated." }),
+    "扩展刚更新过，请刷新页面后再试",
+  );
+  assert.equal(explainRuntimeError({ message: "没有可用的英文词或短语" }), "没有可用的英文词或短语");
 });
 
 test("custom prompts fall back to the packaged system text", () => {

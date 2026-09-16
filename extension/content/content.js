@@ -30,6 +30,7 @@ import {
   walkTextNodes,
 } from "./render.js";
 import { STORAGE_KEYS } from "../shared/constants.js";
+import { explainRuntimeError, isStaleExtensionError, sendRuntime } from "../shared/messages.js";
 import { shouldAutoLearnPage } from "../shared/site.js";
 import { mountSelector } from "./select.js";
 import { mountToolbar, setToolbar } from "./toolbar.js";
@@ -67,7 +68,7 @@ function frameLooksLikeReadingPane() {
 }
 
 async function getState(opts = {}) {
-  return chrome.runtime.sendMessage({ type: "GET_STATE", ...opts });
+  return sendRuntime({ type: "GET_STATE", ...opts });
 }
 
 async function getStateWithRetry(opts = {}) {
@@ -77,12 +78,14 @@ async function getStateWithRetry(opts = {}) {
       const state = await getState(opts);
       if (state && !state.error) return state;
       lastError = state?.error;
+      if (typeof lastError === "string" && lastError.includes("请刷新页面")) break;
     } catch (error) {
       lastError = error;
+      if (isStaleExtensionError(error)) break;
     }
     await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
   }
-  throw new Error(lastError?.message || lastError || "无法读取扩展状态");
+  throw new Error(explainRuntimeError(lastError, lastError?.message || lastError || "无法读取扩展状态"));
 }
 
 async function translateChinese(target) {
@@ -90,7 +93,7 @@ async function translateChinese(target) {
   const paragraphs = blocks.map((el) => (el.innerText || el.textContent || "").trim());
   if (!paragraphs.length) return;
   log("translate paragraphs", paragraphs.length);
-  const translated = await chrome.runtime.sendMessage({
+  const translated = await sendRuntime({
     type: "TRANSLATE_PARAS",
     paragraphs,
   });
@@ -117,7 +120,7 @@ async function annotateEnglish(target, knownLemmas, mwes, drafts) {
   log("unknown units", items.length, items.slice(0, 12));
   let glossMap = {};
   if (items.length) {
-    const result = await chrome.runtime.sendMessage({ type: "GLOSS", items });
+    const result = await sendRuntime({ type: "GLOSS", items });
     if (result?.error) throw new Error(result.error);
     glossMap = result || {};
   }
@@ -530,13 +533,13 @@ globalThis.__littpDispatch ||= handleMessage;
 if (!alreadyLoaded) {
   mountSelector({
     onAddDraft: async (text) => {
-      const result = await chrome.runtime.sendMessage({ type: "ADD_DRAFT", text });
+      const result = await sendRuntime({ type: "ADD_DRAFT", text });
       log("add draft", text, result);
       if (result?.error) return result;
       return { message: `已记下：还不熟悉「${result.text || text}」` };
     },
     onAddKnown: async (text) => {
-      const result = await chrome.runtime.sendMessage({ type: "ADD_KNOWN", text });
+      const result = await sendRuntime({ type: "ADD_KNOWN", text });
       log("add known", text, result);
       if (result?.error) return result;
       return { message: `已记下：很熟悉「${result.text || text}」` };

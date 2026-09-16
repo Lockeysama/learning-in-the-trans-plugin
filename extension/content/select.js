@@ -1,4 +1,5 @@
 import { selectionToDraft } from "../shared/draft.js";
+import { explainRuntimeError } from "../shared/messages.js";
 import { eventFromWidget } from "../shared/site.js";
 
 const HOST_ID = "littp-select-host";
@@ -158,7 +159,7 @@ export function mountSelector({ onAddDraft, onAddKnown }) {
       if (result?.error) return;
       setTimeout(() => hide(), 700);
     } catch (error) {
-      status.textContent = error.message || "处理失败";
+      status.textContent = explainRuntimeError(error);
     }
   }
 

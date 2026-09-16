@@ -29,11 +29,19 @@ function ensureContextMenu() {
 
 ensureContextMenu();
 
+async function reinjectOpenTabs() {
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  await Promise.all(
+    tabs.map((tab) => (tab.id ? injectContentScript(tab.id).catch(() => {}) : Promise.resolve())),
+  );
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   ensureContextMenu();
   if (details.reason === "install") {
     chrome.tabs.create({ url: chrome.runtime.getURL("lexicon/index.html#init") });
   }
+  reinjectOpenTabs().catch(() => {});
 });
 
 chrome.runtime.onStartup.addListener(ensureContextMenu);
