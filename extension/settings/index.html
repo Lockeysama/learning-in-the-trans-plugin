@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Littp 翻译器设置</title>
+    <link rel="stylesheet" href="../ui.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">Littp</p>
+        <nav class="tabs" aria-label="页面">
+          <a href="index.html" class="is-current" aria-current="page">翻译器设置</a>
+          <a href="../lexicon/index.html">词表</a>
+          <a href="../debug/index.html">调试</a>
+        </nav>
+        <h1>翻译器设置</h1>
+        <p class="lead">密钥、释义外观、Prompt 和 Token。词表和初始化在词表页。</p>
+      </header>
+
+      <section class="card">
+        <h2>DeepSeek API Key</h2>
+        <p class="hint">密钥只存在本机扩展存储，不会打进网页请求日志。</p>
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" autocomplete="off" />
+        <div class="actions">
+          <button type="button" id="saveKey">保存</button>
+        </div>
+        <p class="status" id="keyStatus"></p>
+      </section>
+
+      <section class="card">
+        <h2>释义外观</h2>
+        <p class="hint">只改学习视图里原词下方的中文。字号是相对正文英文的百分比，改完当前已打开的学习视图会马上生效。</p>
+        <div class="appearance-grid">
+          <div class="appearance-field">
+            <label for="glossSize">相对原文字号</label>
+            <div class="row">
+              <input id="glossSize" type="range" min="40" max="100" step="1" />
+              <span id="glossSizeValue" class="size-readout">72%</span>
+            </div>
+          </div>
+          <div class="appearance-field">
+            <label for="glossColor">颜色</label>
+            <div class="row">
+              <input id="glossColor" type="color" />
+            </div>
+          </div>
+        </div>
+        <p class="hint">预览。过长的释义会省略，鼠标移上去看全文。</p>
+        <p class="gloss-preview" id="glossPreview">
+          The rain had <span class="littp-unit"><span class="littp-word">eased</span><span class="littp-gloss" data-full="缓和下来，雨势渐渐弱了">缓和下来，雨势渐渐弱了</span></span>, so I went out.
+        </p>
+        <div class="actions">
+          <button type="button" class="secondary" id="resetGlossStyle">恢复默认</button>
+        </div>
+        <p class="status" id="glossStatus"></p>
+      </section>
+
+      <section class="card">
+        <h2>Prompt</h2>
+        <p class="hint">这三条会作为模型的 system 指令。可以改任务说明，但不要改输出 JSON 的字段和结构，否则程序无法解析、保存也会报错。留空并保存等于恢复该条默认。</p>
+        <div id="promptList"></div>
+        <p class="status" id="promptStatus"></p>
+        <div class="actions">
+          <button type="button" id="savePrompts">保存 Prompt</button>
+          <button type="button" class="secondary" id="resetPrompts">全部恢复默认</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Token 消耗</h2>
+        <div class="stats" id="usage"></div>
+        <button type="button" class="secondary" id="clearStats">清零统计</button>
+      </section>
+    </main>
+    <script src="settings.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "littp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "lexicon": "python3 scripts/build-lexicon.py"
+  }
+}

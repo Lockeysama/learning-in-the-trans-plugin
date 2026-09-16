@@ -1,0 +1,88 @@
+{
+  "items": [
+    {
+      "id": "primary-en",
+      "band": "primary",
+      "direction": "en-zh",
+      "prompt": "I like apples.",
+      "reference": "我喜欢苹果。"
+    },
+    {
+      "id": "primary-zh",
+      "band": "primary",
+      "direction": "zh-en",
+      "prompt": "今天天气很好。",
+      "reference": "The weather is very nice today."
+    },
+    {
+      "id": "junior-en",
+      "band": "junior",
+      "direction": "en-zh",
+      "prompt": "She finished her homework before dinner.",
+      "reference": "她在晚饭前做完了作业。"
+    },
+    {
+      "id": "junior-zh",
+      "band": "junior",
+      "direction": "zh-en",
+      "prompt": "请把门关上。",
+      "reference": "Please close the door."
+    },
+    {
+      "id": "senior-en",
+      "band": "senior",
+      "direction": "en-zh",
+      "prompt": "The rain had eased, so I decided to go out.",
+      "reference": "雨小了，所以我决定出门。"
+    },
+    {
+      "id": "senior-zh",
+      "band": "senior",
+      "direction": "zh-en",
+      "prompt": "生活的意义常常藏在日常里。",
+      "reference": "The meaning of life is often hidden in everyday moments."
+    },
+    {
+      "id": "cet4-en",
+      "band": "cet4",
+      "direction": "en-zh",
+      "prompt": "Regardless of the weather, the streets were empty.",
+      "reference": "不管天气如何，街上都空荡荡的。"
+    },
+    {
+      "id": "cet4-zh",
+      "band": "cet4",
+      "direction": "zh-en",
+      "prompt": "我们需要的也许只是驻足片刻。",
+      "reference": "What we need, perhaps, is just to pause for a moment."
+    },
+    {
+      "id": "cet6-en",
+      "band": "cet6",
+      "direction": "en-zh",
+      "prompt": "Sometimes what we need isn't a plan but a pause.",
+      "reference": "有时我们需要的不是计划，而是停顿。"
+    },
+    {
+      "id": "cet6-zh",
+      "band": "cet6",
+      "direction": "zh-en",
+      "prompt": "这项政策旨在缓解交通拥堵。",
+      "reference": "This policy aims to ease traffic congestion."
+    },
+    {
+      "id": "academic-en",
+      "band": "academic",
+      "direction": "en-zh",
+      "prompt": "The findings remain tentative pending further replication.",
+      "reference": "这些发现仍是初步的，有待进一步重复验证。"
+    },
+    {
+      "id": "academic-zh",
+      "band": "academic",
+      "direction": "zh-en",
+      "prompt": "该假说尚未得到充分的实证支持。",
+      "reference": "The hypothesis has not yet received sufficient empirical support."
+    }
+  ]
+}

@@ -1,0 +1,550 @@
+<div data-hil-no-tabs="true" hidden></div>
+
+<section class="section-panel" id="direction" aria-labelledby="direction-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">01</span>
+    <div>
+      <h2 id="direction-title">先给方向</h2>
+      <p>产品已收口：任何网页都先变成用户能读懂的英文。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>v1 默认是学习视图：熟词英文、生词带中文。一键原文等于未处理前的页面。学习视图看不懂不在 v1 处理，留给后续划词翻译。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方确认：读懂优先；两种页面都用英文视角；原文就是处理前的页面；局部看不懂用后续划词翻译，现在不做。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>划词翻译会绕过词表打标，不能提前塞进默认流程。润色若改写熟词，选词控制会失效。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>写最小原型：语种检测、词表打标、生词翻译、学习视图与原文切换、难度只改变熟词门槛。</p></div>
+    </div>
+    <p class="takeaway">旧产品的中英混排已经让位。新默认不是把英文翻成中文，也不是在中文里塞几个词，而是让人读一篇刚够看懂的英文。</p>
+    <div class="split">
+      <article>
+        <h3>已经关闭的问题</h3>
+        <p>主场景是中英文网页。视频不做。旧代码不进新仓库。</p>
+        <p>主收益是读懂，不是会说。</p>
+        <p>两种页面同一阅读视角：熟词英文 + 生词中文。</p>
+        <p>成本不做第一约束。多语种不进 v1。</p>
+      </article>
+      <aside class="inset">
+        <h3>证据分层</h3>
+        <p><strong>已确认</strong>：读懂优先、英文视角、难度和原文/译文切换、从零重写。</p>
+        <p><strong>分析草稿</strong>：难度只调节熟词门槛，不改写句子；熟词匹配用代码。</p>
+        <p><strong>已确认</strong>：原文 = 处理前页面；看不懂留给后续划词翻译。</p>
+      </aside>
+    </div>
+    <div class="callout">
+      <p><strong>有效性先于一次出稿。</strong> 先用词表决定哪些 span 保持英文、哪些需要中文，再调用模型翻译生词。不要让一次生成同时负责翻译、选词和润色。</p>
+    </div>
+  </div>
+</section>
+
+<section class="section-panel" id="problem" aria-labelledby="problem-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">02</span>
+    <div>
+      <h2 id="problem-title">真正的问题与原有路径</h2>
+      <p>产品一开始抓到了真问题，后来用翻译器的实现方式去扩大它。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>Ries 真正要解决的，不是“这一页我看不懂”，而是“我每天接触的英语太少，专门学习又坚持不下去”。原有路径却越来越像一个按段调用大模型的页面改造器。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>创始人在官网和 V2EX 反复说：学不好英语的根本原因是接触太少。同时他又公开说明：一次大模型调用扣 1 积分，大约 20 到 30 个字处理一次。这把“环境改造”做成了“按文本块计费的翻译流水线”。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>视频已被确认用得少、不再做，不再能推翻这条判断。仍可能改变判断的，是英文网页用户到底要“多接触英语”，还是要“先看懂”。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>把“接触不足”和“当下看懂”拆成两个产品任务，不要再用同一个默认开关同时做。</p></div>
+    </div>
+    <h3>原有默认答案</h3>
+    <p>产品默认路径可以概括成一句话：只要用户还在浏览，就把当前页面交给大模型，改造成更接近 i+1 的文本。这个答案很强，因为它不要求用户变成好学生；它也很危险，因为它默认所有页面、所有注意力之外的文字、所有英文原文，都值得立刻改造。</p>
+    <div class="rule-list">
+      <div class="rule-row"><span>用户打开中文页</span><span>植入若干英文词或短语，让人继续读得下去</span></div>
+      <div class="rule-row"><span>用户打开英文页</span><span>翻译大部分内容，只留下一部分原文</span></div>
+      <div class="rule-row"><span>用户看视频</span><span>已确认用量很少，新系统不再做</span></div>
+      <div class="rule-row"><span>用户刷新或后退</span><span>公开反馈里，经常重新消耗积分</span></div>
+    </div>
+    <p>这个路径能解释产品为什么容易被理解成翻译插件：用户看到的是页面文字被改写，付费看到的是大模型调用次数，设置里看到的是 Light / i+1 / Full。学习理论被用来解释改造，计费模型却在奖励“多改、快改、全改”。</p>
+    <details>
+      <summary>查看创始人原话里的产品起点</summary>
+      <p>2025 年 1 月 17 日 V2EX 自荐帖把愿景写成“从日常生活中学习语言”，核心场景是浏览中文网页时植入高频英语单词。<a href="https://www.v2ex.com/t/1105808">来源</a></p>
+      <p>2025 年 7 月 16 日正式介绍帖把原因收成一句：平时接触到的英语太少，专门学的那点输入跟母语环境比不够看，所以 Ries 不提供课程，只实时创造英语接触。<a href="https://www.v2ex.com/t/1145604">来源</a></p>
+      <p>官网同一判断写成：英语学不好的最大原因是接触太少，要把每天接触的大量中文改造一部分成英语接触。<a href="https://ries.ai/zh/learn-english">来源</a></p>
+    </details>
+  </div>
+</section>
+
+<section class="section-panel" id="product-thesis" aria-labelledby="product-thesis-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">03</span>
+    <div>
+      <h2 id="product-thesis-title">构建思路：四个场景，两件不同的事</h2>
+      <p>新系统只保留两个网页场景；视频退出后，中英文页的策略冲突会更清楚。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>中文网页和英文网页都生成同一类学习视图：熟词保持英文，生词给中文。中文页等于「把这篇中文当成英文来读」，所以原文切换是必做，不是附加。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方确认两种页面都以中文用户的英文视角展示，要看到能看懂的内容。疲劳用难度等级和原文/译文切换来处理。成本不作约束。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>这不再是原 Ries 的中英混排。若中文站用户主要想完成阅读任务而不是练英文阅读，默认英文视角必须能立刻退出。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>验收只看：学习视图是否可读，一键能否回到处理前的原文，难度是否只改变熟词门槛。</p></div>
+    </div>
+    <figure class="diagram" aria-labelledby="jobs-caption">
+      <figcaption id="jobs-caption">两种页面汇入学习视图。原文是处理前的页面本身，不是另做一份译文。</figcaption>
+      <p class="diagram-status" role="status">图示尚未加载；可阅读上方说明或展开源码。</p>
+      <div class="diagram-canvas" role="img" aria-label="学习视图与原文切换" hidden></div>
+      <details class="diagram-source"><summary>查看图示源码</summary><pre><code>flowchart LR
+    A[中文网页] --&gt; C[学习视图]
+    B[英文网页] --&gt; C
+    C --&gt; D[熟词英文]
+    C --&gt; E[生词带中文]
+    C --&gt; F[一键回原文]</code></pre></details>
+    </figure>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="新旧场景范围比较">
+      <table>
+        <caption>旧四场景与当前确认后的范围</caption>
+        <thead>
+          <tr>
+            <th scope="col">场景</th>
+            <th scope="col">旧公开做法</th>
+            <th scope="col">当前决定</th>
+            <th scope="col">新系统默认策略</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">中文网页</th>
+            <td>把部分中文词换成英文</td>
+            <td>保留，主场景</td>
+            <td>按 CEFR 词表和密度植入，不猜用户会不会</td>
+          </tr>
+          <tr>
+            <th scope="row">英文网页</th>
+            <td>翻译大约 90%，留下大约 10% 原文</td>
+            <td>保留，主场景</td>
+            <td>分析草稿：默认保原文，只助读 CEFR 之上的难点</td>
+          </tr>
+          <tr>
+            <th scope="row">中文视频</th>
+            <td>字幕替换或标出英文</td>
+            <td>停做</td>
+            <td>不进入新系统</td>
+          </tr>
+          <tr>
+            <th scope="row">英文视频</th>
+            <td>按句给双语、生词或文化解释</td>
+            <td>停做</td>
+            <td>不进入新系统</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>一个能说明冲突的例子</h3>
+    <p>用户在知乎读一篇中文帖，看到“审核”变成 <code>scrutiny</code>，句子还能读完。这是环境改造：内容还是他想看的，只是多了一点英语。同一用户打开 GitHub 或技术文档，插件把整页翻成中文，再留几个英文词。他马上觉得产品在帮自己逃避英语。两件事都能叫“改造”，但对语言接触的方向完全相反。</p>
+    <p>这个冲突不是后期功能堆出来的旁支。2025 年 1 月的第一篇自荐帖已经同时承诺两件事：中文内容智能植入，以及英语内容减压到约 90% 可理解。产品从第一天就把“创造接触”和“充当翻译”绑在一起。</p>
+    <details>
+      <summary>查看旧四场景的公开来源，仅作历史对照</summary>
+      <p>官网学习页把四个场景并列：中文网页、中文视频、英语视频、英语网页。<a href="https://ries.ai/zh/learn-english">ries.ai/zh/learn-english</a></p>
+      <p>小众软件和 2025 年 7 月正式介绍帖使用同一套四场景文案，英文网页明确写了“翻译大部分你可能不认识的生词（例如 90%）”。<a href="https://www.appinn.com/ries-ai/">appinn.com/ries-ai</a> · <a href="https://www.v2ex.com/t/1145604">v2ex.com/t/1145604</a></p>
+      <p>Chrome 商店页把差异写成：翻译器解决“我现在看不懂”，Ries 解决“我长期接触不够”。<a href="https://chromewebstore.google.com/detail/ries-ai-english-learning/gommajbfaholfodlhddhaonphdhonjgj">Chrome 商店页</a></p>
+    </details>
+  </div>
+</section>
+
+<section class="section-panel" id="theory" aria-labelledby="theory-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">04</span>
+    <div>
+      <h2 id="theory-title">理论支持与理论错位</h2>
+      <p>真正站得住的不是“精确 i+1”，而是低压力、持续、在真实内容里接触。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>Krashen 的可理解输入和情感过滤，能支持“少压力、多接触、用自己关心的内容”。它不能直接证明“在中文句子里替换几个英文词 = i+1”。产品把一个有争议的教学策略，宣传成了已被验证的精确算法。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>官网把边界拓宽法建立在“略高于当前水平”上。社区里已有用户指出，这更接近 translanguaging（跨语实践），对二语习得效果仍有争议。创始人自己也承认早期 Light 模式是按句混入词组，并不是已经完成的个性化语言图谱。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>产品方已确认现有分层是 CEFR，效果一般，且认为靠 AI 很难做准。这关闭了“先做一个更聪明的 AI 图谱”这条路，但不关闭“用公开 CEFR 词表做候选池”。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>新系统把 CEFR 当成粗分层：决定词从哪一层抽、密度大概多少。个性化只做已会、忽略、太难。不要让模型判断“这个用户认不认识这个词”。</p></div>
+    </div>
+    <div class="split">
+      <article>
+        <h3>站得住的部分</h3>
+        <p>接触量不足，是成人外语学习者的真实约束。专门课程和单词 App 要求额外时间，失败率高，不需要再争论。</p>
+        <p>Krashen 的情感过滤假说和产品的“无痛、不打断、不打卡”是对齐的：压力太大，人会退出，退出后接触量变成零。</p>
+        <p>用用户已经关心的内容，比用标准化教材更容易维持输入。这更接近情境学习和伴随性词汇习得，而不只是 i+1。</p>
+      </article>
+      <article>
+        <h3>撑不住的部分</h3>
+        <p>i+1 在学术上本来就难以精确操作。没有稳定的方法能证明某一句刚好是某个人的 i+1。把大模型选词宣传成“精确实现 i+1”，是把假说写成了仪表。</p>
+        <p>中文主导、偶尔混入英文，不是可理解的英语输入，而是母语语码转换。读者理解靠的是中文，不是英语。</p>
+        <p>英文页先翻掉 90%，是在减少目标语输入。这可能降低焦虑，但不再是 Krashen 意义上的习得环境。</p>
+      </article>
+    </div>
+    <h3>一个能把抽象理论落地的例子</h3>
+    <p>假设用户读到：“语言能力的提升主要源自持续的可理解性输入。” 产品把“语言能力”换成 <code>language ability</code>，把“研究”换成 <code>research</code>。读者依然靠中文读完全句。他看见了两个英文词，这是词汇曝光，有价值；但这不是 i+1 英语输入，因为他没有在理解英语句子。真正接近 i+1 的，是他读一篇大体能懂的英文，只在一两个词上获得帮助。</p>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="宣传理论与更贴切机制对照">
+      <table>
+        <caption>宣传用的理论和更贴切的机制，不应混成一件事</caption>
+        <thead>
+          <tr>
+            <th scope="col">产品说法</th>
+            <th scope="col">更贴切的机制</th>
+            <th scope="col">对功能的要求</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">i+1 可理解输入</th>
+            <td>英文内容减压助读，尽量保住原文</td>
+            <td>默认保留英文，只助读难点</td>
+          </tr>
+          <tr>
+            <th scope="row">边界拓宽法</th>
+            <td>控制压强，让接触可以持续</td>
+            <td>能调密度，能标记已会，能关闭场景</td>
+          </tr>
+          <tr>
+            <th scope="row">语言图谱</th>
+            <td>CEFR 粗分层 + 用户标记</td>
+            <td>不让 AI 预测个人词表；词表公开，标记可改</td>
+          </tr>
+          <tr>
+            <th scope="row">无痛接触</th>
+            <td>情感过滤 + 伴随性学习</td>
+            <td>不打断阅读，不改造注意力之外的区域</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>CEFR 效果一般，不等于要换成 AI 猜词</h3>
+    <p>一个 B1 用户仍然可能认识 <code>algorithm</code>，不认识 <code>scrutiny</code>。CEFR 解释不了这种个人差异，所以“效果一般”是预期内的。AI 猜“这个人会不会这个词”，同样缺少稳定监督信号：用户没有每次都告诉你对错，模型只能靠文本本身编一个边界。新系统更稳的做法是：CEFR 决定候选池和默认密度，用户点一次“已会”就永久降权。宁可少换、换准一点，也不要假装画出了个人语言地图。</p>
+    <div class="callout">
+      <p><strong>还缺一块理论，而且会改变产品形状。</strong> 输入假说几乎不处理输出。公开反馈里已有人说：系统全英文后单词量上去了，听和说还是不行。新系统如果只做网页接触，就应诚实不承诺口语和产出。</p>
+    </div>
+    <details>
+      <summary>查看理论判断的来源与争议</summary>
+      <p>官网将方法建立在 Stephen Krashen 1985 年提出的可理解输入，并写成“数十年语言学界的验证和实践”。<a href="https://ries.ai/zh/learn-english">来源</a></p>
+      <p>V2EX 用户 Bapper 指出，这很像 translanguaging，对二语习得效果还有争议。创始人回复自己是第一次听说这个词。<a href="https://www.v2ex.com/t/1145604">来源</a></p>
+      <p>2025 年 1 月创始人说明当时体验到的是 Light 模式，按句做增强、混入一个词组；i+1 模式当时还是后续计划。<a href="https://www.v2ex.com/t/1105808">来源</a></p>
+      <p>Krashen 的 i+1 本身长期被批评难以操作化。本次不把这一点写成“理论无效”，只写成：它不能单独证明当前中英混排策略有效。</p>
+    </details>
+  </div>
+</section>
+
+<section class="section-panel" id="implementation" aria-labelledby="implementation-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">05</span>
+    <div>
+      <h2 id="implementation-title">实现方式：能确定的，和还不能确定的</h2>
+      <p>旧流水线只用来说明不该再抄什么。新系统从零搭，不盘旧代码。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>旧实现把“环境改造”做成了按短块调用大模型的流水线。新系统可以完全丢掉这段代码，但必须丢掉它的默认习惯：见字就改、见刷新就重算、靠模型临场决定难度。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>公开说明里，一次模型调用扣 1 积分，大约 20 到 30 个字处理一次。产品方现在确认旧代码由低版本模型写成、重构不划算，决定从头构建。视频场景正是这条流水线最贵的出口，现已停做。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>从零重写不等于不要约束。如果新系统仍然按短块计费、仍然让模型决定每个词，用户感知会回到同一套伤害。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>新架构按四层从空白写：正文提取、改造策略、渲染、记忆与成本。模型只负责把已选定的词自然写进句子，不负责诊断用户水平。</p></div>
+    </div>
+    <figure class="diagram" aria-labelledby="pipeline-caption">
+      <figcaption id="pipeline-caption">旧处理链只作为反面参照：页面被切块后直接进模型。新系统应先用词表和规则决定改什么，再考虑要不要调用模型。</figcaption>
+      <p class="diagram-status" role="status">图示尚未加载；可阅读上方说明或展开源码。</p>
+      <div class="diagram-canvas" role="img" aria-label="公开可还原的处理流水线" hidden></div>
+      <details class="diagram-source"><summary>查看图示源码</summary><pre><code>flowchart LR
+    A[网页或字幕] --&gt; B{是否在黑名单}
+    B -->|是| C[跳过]
+    B -->|否| D[切成短文本块]
+    D --&gt; E[调用大模型]
+    E --&gt; F[写回页面]
+    E --&gt; G[扣除 1 积分]</code></pre></details>
+    </figure>
+    <div class="cards">
+      <article class="card">
+        <h3>已能确定</h3>
+        <p>Chrome / Edge / Firefox 扩展，另有 iOS 客户端。商店页版本 3.50，大小 27.22MiB，更新于 2026 年 7 月 7 日。</p>
+        <p>免费每天 200 积分；创始人说过 Pro 每月约 6 万积分。计费单位是一次模型调用，不是一个单词。</p>
+        <p>存在 Light、i+1、Full 三种模式。英文内容设成 Full 时，创始人说过可以跳过不处理。</p>
+        <p>会收集个人身份信息、用户活动和网站内容。登录后才能稳定使用，是反复出现的体验门槛。</p>
+      </article>
+      <article class="card">
+        <h3>对新系统不再重要</h3>
+        <p>旧语言图谱如何实现，不再盘点。产品方已确认它是 CEFR，效果一般。</p>
+        <p>视频五档注解、27MB 插件体积、旧缓存有没有做成，都不进入新设计。</p>
+        <p>旧代码质量、旧模型版本、旧模块边界，全部沉底。</p>
+        <p>要带进新系统的，只有产品契约和用户伤害，不是实现细节。</p>
+      </article>
+    </div>
+    <h3>实现方式对产品思考的影响</h3>
+    <p>一旦计费绑在“调用次数”上，工程上最自然的优化是少调用、多缓存、只处理正文。产品上最自然的膨胀却是多场景、全自动、什么都丢给模型。视频已经证明这条膨胀会把试用烧光。新系统停掉视频，还不够；如果网页仍然见字就进模型，伤害只会换个入口回来。</p>
+    <p>所以从零构建时，第一问仍是“哪些文本根本不该进模型”，不是“用哪个新框架、哪个新模型”。词表、密度、已会词、正文范围，都可以在调用模型之前决定。</p>
+    <details>
+      <summary>查看实现相关的公开出处</summary>
+      <p>积分与切块：创始人 2025 年 7 月 16 日回复，免费每天 200，Pro 每月 6 万，一次模型调用扣 1 分，平均约 30 个字处理一次。<a href="https://www.v2ex.com/t/1145604">来源</a></p>
+      <p>视频耗分：创始人在小众软件论坛承认，视频字幕是“性能火力全开”，高频高质量调用，200 初始积分主要想让用户先体验网页。<a href="https://meta.appinn.net/t/topic/73494">来源</a></p>
+      <p>缓存：同一 V2EX 帖里，用户要求刷新后不要重算，创始人回复“必须做，也在规划中”。</p>
+      <p>模式：2025 年 1 月自荐帖回复写明 Light / i+1 / Full 三种模式，并承认当时用户体验到的是 Light。<a href="https://www.v2ex.com/t/1105808">来源</a></p>
+      <p>商店事实：4.2 分，57 个评分，版本 3.50，27.22MiB，处理个人身份信息、用户活动和网站内容。<a href="https://chromewebstore.google.com/detail/ries-ai-english-learning/gommajbfaholfodlhddhaonphdhonjgj">来源</a></p>
+    </details>
+  </div>
+</section>
+
+<section class="section-panel" id="feedback" aria-labelledby="feedback-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">06</span>
+    <div>
+      <h2 id="feedback-title">用户体验与反馈</h2>
+      <p>用户不是在评价一个理论，而是在评价：它有没有让我多接触英语，又有没有把今天的阅读毁了。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>公开反馈高度一致：喜欢“看自己本来就看的内容时遇见英语”；不喜欢额度、英文页被整翻、非正文也被改、简单词反复出现、登录和性能不稳。这已经够用来做产品取舍，不必等更漂亮的问卷。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>V2EX 两篇主帖、小众软件论坛、独立评测和商店评分，重复出现同一组信号。正面评价集中在中文环境植入和低压力；负面评价集中在成本和控制权。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>这些是自我选择后的公开发言，不是随机样本。Chrome 商店只有 57 个评分，不能当成大规模满意度。内部沉默流失完全可能更狠。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>新系统优先消化这些仍然有效的网页反馈：额度、英文整翻、非正文改造、简单词无法标已会。视频相关抱怨不再进入功能列表。</p></div>
+    </div>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="公开反馈主题对照">
+      <table>
+        <caption>公开反馈里反复出现的主题，按会改变产品判断的程度排列</caption>
+        <thead>
+          <tr>
+            <th scope="col">用户在说什么</th>
+            <th scope="col">代表信号</th>
+            <th scope="col">对产品意味着什么</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">中文里冒出英文，一开始当 bug，后来发现这就是用法</th>
+            <td>官网引用、V2EX、小众软件反复出现</td>
+            <td>主价值已经被用户自己讲清楚了，应保护这个惊奇感</td>
+          </tr>
+          <tr>
+            <th scope="row">看两分钟视频，200 积分没了</th>
+            <td>小众软件论坛；创始人亲自回复承认</td>
+            <td>已确认停做视频，这条不再占用新系统范围</td>
+          </tr>
+          <tr>
+            <th scope="row">刷几个网页额度就没了，刷新还重算</th>
+            <td>V2EX 多条，含已付费用户</td>
+            <td>成本体验正在杀死理念体验</td>
+          </tr>
+          <tr>
+            <th scope="row">英文页不该整页翻成中文</th>
+            <td>2025 年 1 月和 6 月帖都有，创始人多次说“收到”</td>
+            <td>默认英文策略和用户要学英语的动机冲突</td>
+          </tr>
+          <tr>
+            <th scope="row">标题、侧栏、折叠内容也被改，读起来莫名其妙</th>
+            <td>知乎标题被改成只有 why；用户建议只改正文</td>
+            <td>注意力之外的改造既费积分，也破坏阅读</td>
+          </tr>
+          <tr>
+            <th scope="row">同一词反复替换，简单词无法标“已学会”</th>
+            <td>“工作”被多次换成 work；user 不必出现</td>
+            <td>没有真实图谱时，混排会显得廉价和噪音</td>
+          </tr>
+          <tr>
+            <th scope="row">登录、站点兼容、卡死、海外访问</th>
+            <td>Google 登录 500、已登录仍提示登录、部分站卡死</td>
+            <td>基础设施不稳，理念还没被体验到人就走了</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>谁在留下，谁在离开</h3>
+    <p>留下的人通常有一个共同结构：工作忙，不想单独学，但又承认接触太少。他们接受中英混排，愿意用黑名单和白名单自己管成本，有人甚至因此付年费。离开的人通常不是否定理念，而是发现自己无法控制改造范围和消耗。有人写：刚用觉得不错，刷页面一多资源不够，现在反而不用了。</p>
+    <p>还有一类更尖锐的用户，其实更接近你们想要的进阶学习者。他们不要中文注释一直挂在词后面，不要简单词，不要英文页被翻译，想用英语学英语，想标记已会。创始人公开回复过：已学会在迭代，中文注释可以关，英文注释暂时不支持。这说明产品还更偏向“用中文保护理解”，而不是“把用户推向更多英语”。</p>
+    <details>
+      <summary>查看反馈原句与出处</summary>
+      <p>“就，真的很神奇？我平时看小说、刷微博时会出现一些英文单词和短语，一开始还以为是 bug。” 官网与后续传播反复使用。<a href="https://ries.ai/zh/learn-english">来源</a></p>
+      <p>“看了两分钟视频就把免费的 200 积分用光了，根本没法测试。” <a href="https://meta.appinn.net/t/topic/73494">小众软件论坛</a></p>
+      <p>“刚使用觉得不错，但很快就随着我刷页面数量变多，资源不够了，所以现在反而不用了。” <a href="https://www.v2ex.com/t/1141385">V2EX</a></p>
+      <p>“我买了 pro 会员没想到一周就把一个月的配额用完了。” 同一帖。</p>
+      <p>“中文界面带英文翻译很好。但是英文页面会自动将所有英文翻译成中文，就不好了。” 同一帖。</p>
+      <p>“简单单词无法选择已学会……将中文替换为英语单词后，中文仍显示……只有中文注释，无法选择英文注释。因为这 3 点原因我目前还无法使用 ries。” <a href="https://www.v2ex.com/t/1145604">V2EX</a></p>
+      <p>“开了 2 到 4 个网页免费改装积分额度就被用完了。主要是在不必要的内容上浪费了大部分改造积分。” <a href="https://www.v2ex.com/t/1134678">V2EX</a></p>
+      <p>独立评测也观察到：官方说任意网页都支持，实际有些站点支持性很差。<a href="https://www.kocpc.com.tw/archives/608735">电脑王阿达</a></p>
+    </details>
+  </div>
+</section>
+
+<section class="section-panel" id="keep-cut-grow" aria-labelledby="keep-cut-grow-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">07</span>
+    <div>
+      <h2 id="keep-cut-grow-title">保留、移除、增强</h2>
+      <p>取舍标准只有一条：它是在增加可承受的英语接触，还是在增加翻译、成本和噪音。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>保留网页双场景和可控制的内容改造。移除视频、AI 个人图谱，以及英文页默认整翻。增强 CEFR 词表、已会/忽略、正文识别和缓存。这些是新系统的范围，不是旧代码补丁列表。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方已确认场景和重写策略。公开反馈仍然指向额度、英文整翻和简单词噪音。CEFR 效果一般，所以增强的是词表加用户标记，不是更强的猜测。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>英文页默认保原文是分析草稿。若你们确认英文用户主要是初学者、先要看懂，可以把整翻设成默认，但必须和中文植入分开命名，避免产品再次自称翻译器。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>按下面清单冻结 v1。不在清单里的，包括视频、口语、多语言、自定义 API，先不进新仓库。</p></div>
+    </div>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="保留移除增强清单">
+      <table>
+        <caption>建议清单是分析草稿。每一项都附上会改变判断的条件</caption>
+        <thead>
+          <tr>
+            <th scope="col">动作</th>
+            <th scope="col">对象</th>
+            <th scope="col">为什么</th>
+            <th scope="col">什么信号出现时重开</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">保留</th>
+            <td>中文内容里植入英语</td>
+            <td>这是用户能自己讲出来的独特价值</td>
+            <td>中英文网页都已确认是主场景，这项不再用来降级中文页</td>
+          </tr>
+          <tr>
+            <th scope="row">保留</th>
+            <td>站点禁用、原文切换、选中查词</td>
+            <td>没有控制权，改造会变成破坏</td>
+            <td>若这些入口本身造成复杂和不敢用</td>
+          </tr>
+          <tr>
+            <th scope="row">保留</th>
+            <td>“不额外上课、用已有内容”的承诺</td>
+            <td>这是和课程、单词 App、整页翻译的真正差异</td>
+            <td>若用户其实在要求完整学习系统</td>
+          </tr>
+          <tr>
+            <th scope="row">移除或降级</th>
+            <td>英文页默认大面积译成中文</td>
+            <td>和“增加接触”相反，也是重复投诉点</td>
+            <td>若目标用户明确是英语初学者，需要先看懂再学习</td>
+          </tr>
+          <tr>
+            <th scope="row">移除</th>
+            <td>全部视频能力</td>
+            <td>用量少，成本高，产品方已决定停做</td>
+            <td>只有网页双场景稳定后、且有新证据证明视频值得单独产品时再开</td>
+          </tr>
+          <tr>
+            <th scope="row">移除或降级</th>
+            <td>注意力外区域的自动改造</td>
+            <td>浪费积分，破坏扫读，让标题变得不可理解</td>
+            <td>若正文识别误伤太多，用户反而抱怨“没改到”</td>
+          </tr>
+          <tr>
+            <th scope="row">移除</th>
+            <td>AI 预测个人词表</td>
+            <td>CEFR 已经效果一般，产品方认为 AI 更难做准</td>
+            <td>只有出现可观察的对错反馈，且离线评估证明模型优于词表时再开</td>
+          </tr>
+          <tr>
+            <th scope="row">增强</th>
+            <td>CEFR 词表 + 已会 / 忽略 / 太难</td>
+            <td>这是当前唯一廉价、可解释的个性化</td>
+            <td>若用户完全不愿意点一次标记，再考虑更轻的默认密度</td>
+          </tr>
+          <tr>
+            <th scope="row">增强</th>
+            <td>正文 / 视口优先，结果缓存</td>
+            <td>同时改善阅读体验和成本，是用户和创始人都点过的</td>
+            <td>若缓存导致过期改写或隐私风险不可接受</td>
+          </tr>
+          <tr>
+            <th scope="row">增强</th>
+            <td>从词到短语再到短句的密度控制</td>
+            <td>这是官方路线图里最接近“拓宽边界”的部分</td>
+            <td>若用户其实只要稳定的轻度词替换，不想升级到句子</td>
+          </tr>
+          <tr>
+            <th scope="row">增强</th>
+            <td>英文页改为保留原文 + 难词释义</td>
+            <td>用户多次明确要这个，也更接近真正的 i+1</td>
+            <td>若你们确认英文页用户主要要整页翻译，则改为显式减压默认</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>不建议在第一版里顺手做大的东西</h3>
+    <p>视频、口语、写作、完整课程、多语言全面铺开、自定义 API、Safari，都先不进新系统。第一版只证明一件事：在中文和英文网页上，改造是可控制、可缓存、不靠 AI 猜词的。</p>
+    <div class="callout warn">
+      <p><strong>定价不是这次的主结论，但它会污染产品判断。</strong> 用户骂贵，往往先骂的是“我还没理解产品，额度就没了”。在缓存、正文过滤、首跑场景改完之前，先降价或先做买断，可能只是补贴一个仍会失控的流水线。</p>
+    </div>
+  </div>
+</section>
+
+<section class="section-panel" id="before-refactor" aria-labelledby="before-refactor-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">08</span>
+    <div>
+      <h2 id="before-refactor-title">重构前要先锁的判断</h2>
+      <p>从零重写可以摆脱旧代码，但不能把旧默认行为再写一遍。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>可以开始新仓库。对象是“网页上可控制压强的内容改造引擎”，不是翻译插件，也不是旧扩展的清洁版。旧代码、旧模型、旧模块名字都不进入设计。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方已确认重构旧代码不划算。公开伤害来自默认行为，不是来自某个目录结构。新系统如果仍默认整翻英文、仍让模型猜词、仍改整页，重写不会改变用户感受。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>还没锁死的只有英文页默认策略。下面四条里，前三条已够开始；第四条里的英文默认，仍标为分析草稿。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>先把契约写成新系统的验收条件，再选技术栈。不要先选框架再回头找产品。</p></div>
+    </div>
+    <div class="rule-list">
+      <div class="rule-row"><span>默认任务</span><span>创造英语接触。立刻看懂，只能是用户主动打开的减压模式</span></div>
+      <div class="rule-row"><span>默认场景</span><span>中文网页和英文网页的正文。视频不在范围里</span></div>
+      <div class="rule-row"><span>默认范围</span><span>只改用户正在看的正文或视口，不改导航、侧栏、未展开标题</span></div>
+      <div class="rule-row"><span>默认记忆</span><span>CEFR 定候选池；已会词不再出现；同一段内容不无故重算</span></div>
+    </div>
+    <h3>新系统的模块形状</h3>
+    <p>这是产品层切开，不是在描述旧代码。第一版按这四层从空白写，就可以避免再长成“打开页面就翻译”的单函数。</p>
+    <div class="cards">
+      <article class="card">
+        <h3>提取</h3>
+        <p>只找网页正文和视口内文本。视频字幕不进入。</p>
+      </article>
+      <article class="card">
+        <h3>策略</h3>
+        <p>中英文页都生成英文阅读视图。难度只改变熟词门槛。</p>
+      </article>
+      <article class="card">
+        <h3>渲染</h3>
+        <p>写回页面。必做：学习视图与一键原文。原文就是处理前的 DOM。</p>
+      </article>
+      <article class="card">
+        <h3>记忆与成本</h3>
+        <p>缓存、已会词、忽略词。模型只处理策略层已经选定的替换。</p>
+      </article>
+    </div>
+    <p>如果第一笔代码仍然从“把这段文字交给大模型，让它决定怎么改”开始，新仓库也会很快长回旧产品。</p>
+  </div>
+</section>
+
+<section class="section-panel" id="next" aria-labelledby="next-title">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">09</span>
+    <div>
+      <h2 id="next-title">下一步与回看</h2>
+      <p>阅读视角已经锁住。下一步是按契约做最小原型，而不是继续加机制。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>可以开始从零构建最小扩展。默认学习视图：熟词英文 + 生词中文。一键回原文。难度只调节熟词门槛。划词翻译后做。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方确认：原文就是处理前的内容；切原文就是不看处理后的英文。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>学习视图看不懂不在 v1 范围，后续用划词翻译。现在加入会打乱默认流程。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>实现：语种检测、词表打标、生词翻译、学习视图与原文切换、难度。润色和划词翻译后做。</p></div>
+    </div>
+    <div class="rule-list">
+      <div class="rule-row"><span>已关闭</span><span>主收益是读懂。两种页面都用英文视角。视频、旧代码、多语种、AI 全量熟词表生成，不进 v1。</span></div>
+      <div class="rule-row"><span>已确认</span><span>原文 = 没处理前的内容。英页原文是英文，中页原文是中文。切原文 = 不看处理后的英文。</span></div>
+      <div class="rule-row"><span>随后动手</span><span>学习视图与原文切换。难度 = 熟词门槛。划词翻译、润色后做。</span></div>
+    </div>
+    <h3>回看标准</h3>
+    <p>原型在真实中英文页上跑过就能看：</p>
+    <ul>
+      <li><code>this</code> / <code>please</code> 是否还被当成生词。</li>
+      <li>英文页是否仍是英文句子，而不是先变成中文再拼回来。</li>
+      <li>中文页在学习视图下能否读完；读不完时，一键原文是否立刻可用。</li>
+      <li>把难度调高后，中文是不是变少、英文是不是变多，而句子结构没有被模型改乱。</li>
+    </ul>
+    <div class="inset">
+      <h3>这次判断可以沉淀什么</h3>
+      <p>可留下的原则：Ries 的 v1 卖的是「刚够看懂的英文」；原文就是处理前的页面。可沉底的是把原文理解成另做一份译文。</p>
+    </div>
+  </div>
+</section>

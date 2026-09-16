@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Littp 调试</title>
+    <link rel="stylesheet" href="../ui.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">Littp</p>
+        <nav class="tabs" aria-label="页面">
+          <a href="../settings/index.html">翻译器设置</a>
+          <a href="../lexicon/index.html">词表</a>
+          <a href="index.html" class="is-current" aria-current="page">调试</a>
+        </nav>
+        <h1>调试</h1>
+        <p class="lead">记录行为和模型的 Prompt、USER Input、response。密钥不会写入日志。</p>
+      </header>
+
+      <section class="card">
+        <h2>调试输出</h2>
+        <label class="choice"><input type="checkbox" id="debugEnabled" /> 开启调试输出</label>
+        <p class="hint">开启后再跑一次学习视图，日志会出现在下面。</p>
+        <p class="status" id="debugStatus"></p>
+        <button type="button" class="secondary" id="clearLogs">清空日志</button>
+        <div id="logs" class="logs"></div>
+      </section>
+    </main>
+    <script src="debug.js" type="module"></script>
+  </body>
+</html>

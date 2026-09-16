@@ -1,0 +1,183 @@
+:root {
+  --bg: #f3efe6;
+  --ink: #1c1917;
+  --muted: #57534e;
+  --card: #fffcf6;
+  --line: #e7e0d4;
+  --accent: #0f766e;
+  --accent-ink: #ecfdf8;
+  --warn: #9a3412;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "PingFang SC", sans-serif;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+.wrap {
+  width: 320px;
+  padding: 14px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.sub, .status, .hint {
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.head .sub {
+  margin: 0;
+}
+
+.icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+}
+
+.icon-btn:hover {
+  background: #e7e0d4;
+  color: var(--ink);
+}
+
+.status[hidden] { display: none; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+label {
+  display: block;
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+input[type="password"], input[type="text"], select, textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+textarea { min-height: 72px; resize: vertical; }
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.actions {
+  margin: 4px 0 8px;
+}
+
+.actions button {
+  flex: 1;
+}
+
+.switch {
+  display: flex;
+  margin: 4px 0 8px;
+  padding: 3px;
+  background: #e7e0d4;
+  border-radius: 999px;
+}
+
+.switch-btn {
+  flex: 1;
+  background: transparent;
+  color: var(--ink);
+}
+
+.switch-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.card > .choice + .choice {
+  margin-top: 8px;
+}
+
+.card .hint {
+  margin: 8px 0 0;
+}
+
+.row label.choice,
+label.choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+label.choice:has(input:disabled) {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #e7e0d4;
+  color: var(--ink);
+}
+
+button.full {
+  width: 100%;
+  margin: 0 0 10px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.host {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.error { color: var(--warn); }

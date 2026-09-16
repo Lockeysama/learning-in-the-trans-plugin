@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Littp v1 需求、方案与开发计划</title>
+  <style>
+    :root{--bg:#eef1f5;--paper:#fff;--ink:#243044;--muted:#586579;--line:#d8e0eb;--accent:#245bb3;--good:#236849;--warn:#875600;--danger:#ab303b}
+    *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+    a{color:var(--accent);text-underline-offset:.2em;overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}
+    button,summary,a,[tabindex]{outline-offset:4px}:focus-visible{outline:3px solid var(--accent)}
+    main{max-width:1360px;margin:auto;padding:32px 32px 48px;overflow-wrap:anywhere}
+    .document-header{max-width:1120px;margin:0 auto 24px;padding:0 0 24px;border-bottom:1px solid #cdd7e4}
+    .eyebrow{color:var(--accent);font-size:.75rem;font-weight:700;letter-spacing:.12em;margin:0 0 8px}
+    h1{font-size:clamp(1.7rem,3vw,2.25rem);line-height:1.3;letter-spacing:-.025em;font-weight:780;color:#17263d;margin:0 0 10px}
+    h2{font-size:1.25rem;line-height:1.45;font-weight:760;letter-spacing:-.01em;margin:0}h3{font-size:1rem;line-height:1.5;font-weight:700;color:#30445f;margin:0 0 8px}
+    p{margin:0 0 12px}.lead{max-width:42em;font-size:1rem;margin-bottom:10px}.meta,.muted{color:var(--muted);font-size:.83rem}.meta{margin:0}
+    .document-layout{display:block;min-width:0}.document-body{min-width:0;max-width:1120px;margin:0 auto}
+    .toc{position:fixed;z-index:20;right:24px;bottom:84px;width:196px;max-height:calc(100vh - 108px);max-width:calc(100vw - 48px);overflow-y:auto;font-size:.875rem;padding:12px;background:rgba(255,255,255,.96);border:1px solid #cbd7e6;border-radius:12px;box-shadow:0 8px 28px #24304418;backdrop-filter:blur(10px);transition:opacity .16s ease,transform .16s ease}
+    .toc>strong{display:block;font-size:.75rem;color:var(--muted);letter-spacing:.1em;padding:0 12px 12px}.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}.toc li{margin:0}.toc a{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 12px;border:1px solid transparent;border-radius:8px;color:var(--muted);text-decoration:none}.toc a span{flex:0 0 1.8em;white-space:nowrap;font-size:.75rem;font-variant-numeric:tabular-nums;color:#718099}.toc a:hover{background:#e4eaf2;color:var(--ink)}.toc a[aria-current="location"]{background:#fff;border-color:#d4dfed;color:var(--accent);font-weight:650;box-shadow:0 2px 4px #23344806}.toc-note{border-top:1px solid var(--line);margin:20px 12px 0;padding-top:14px;font-size:.78rem;color:var(--muted)}
+    .toc>strong{padding-right:12px}.toc.is-collapsed{opacity:0;transform:translateX(14px);pointer-events:none}.toc-fab{position:fixed;z-index:21;right:24px;bottom:24px;width:46px;height:46px;padding:0;border:1px solid #cbd7e6;border-radius:50%;background:rgba(255,255,255,.97);box-shadow:0 8px 24px #24304420;color:var(--accent);font-size:1.05rem;cursor:pointer}.toc-fab:hover{border-color:var(--accent);transform:translateY(-1px)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin:0 0 14px}.mode-switch-wrap{display:flex;align-items:center;gap:6px}.mode-switch{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:190px;padding:3px;border:1px solid #bdcde3;border-radius:10px;background:#e8eef8;isolation:isolate}.mode-switch-thumb{position:absolute;z-index:-1;inset:3px auto 3px 3px;width:calc(50% - 3px);border-radius:7px;background:#fff;box-shadow:0 2px 6px #24304418;transition:transform .2s ease}.mode-switch[data-active="long"] .mode-switch-thumb{transform:translateX(100%)}.mode-switch button{position:relative;z-index:1;border:0;background:transparent;color:var(--muted);padding:7px 12px;min-height:34px;font-size:.8rem}.mode-switch button[aria-checked="true"]{color:var(--accent);font-weight:750}.mode-switch button:focus-visible{z-index:2}.mode-recommendation{white-space:nowrap;color:var(--muted);font-size:.72rem}
+    .hil-tabs{margin:0 0 24px}.hil-tab-controls{display:grid;gap:12px;margin:0 0 16px}.hil-tablist{display:flex;flex-wrap:wrap;gap:6px;padding:3px;border-bottom:1px solid var(--line)}.hil-tablist [role="tab"]{flex:0 0 auto;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:transparent;color:var(--muted);padding:10px 14px;min-height:42px;cursor:pointer}.hil-tablist [role="tab"]:hover{background:#edf2f9;color:var(--ink)}.hil-tablist [role="tab"][aria-selected="true"]{border-bottom-color:var(--accent);background:#edf3ff;color:var(--accent);font-weight:650}.hil-tab-actions{display:none}.hil-tabs.is-ready [role="tabpanel"][hidden]{display:none}.hil-tabs.is-expanded .hil-tab-controls,.hil-tabs.is-expanded>[role="tablist"]{display:none}.hil-tabs .section-panel:last-child{margin-bottom:0}
+    .mode-switch[data-options="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.mode-switch[data-options="2"] .mode-switch-thumb{width:calc(50% - 3px)}
+    button{font:inherit;font-size:.8rem;border:1px solid #cdd7e4;border-radius:7px;padding:6px 12px;min-height:34px;background:var(--paper);color:var(--ink);cursor:pointer}button:hover{border-color:var(--accent)}
+    .section-panel{margin:0 0 24px;min-width:0;border:1px solid #cbd7e6;border-top:4px solid #abc3e8;background:var(--paper);border-radius:14px;box-shadow:0 6px 18px #2430440a;scroll-margin-top:24px}
+    .section-head{display:flex;align-items:flex-start;gap:14px;padding:18px 24px;background:linear-gradient(110deg,#edf4ff,#f8fafd 72%);border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}.section-head p{margin:3px 0 0;color:var(--muted);font-size:.85rem}.section-index{display:grid;place-items:center;flex:0 0 34px;height:34px;border:1px solid #b7cdf0;border-radius:9px;background:#e3eeff;color:var(--accent);font-size:.8rem;font-weight:750;font-variant-numeric:tabular-nums}
+    .section-body{padding:24px}.section-body>:last-child{margin-bottom:0}.section-body>p{max-width:42em}.takeaway{font-size:1.12rem;font-weight:600;line-height:1.65;margin:0 0 20px;max-width:42em}.prose{max-width:42em}strong{font-weight:700}li+li{margin-top:.35em}
+    .decision-summary{display:grid;grid-template-columns:1fr;margin:0 0 22px;padding:8px 18px;border:1px solid #b8cdea;border-radius:11px;background:#fff}.decision-summary-item{display:grid;grid-template-columns:120px minmax(0,1fr);gap:20px;align-items:start;min-width:0;padding:12px 0;border-bottom:1px solid #d9e4f2}.decision-summary-item:last-child{border-bottom:0}.decision-summary-item strong{display:inline-block;justify-self:start;padding:4px 8px;border-radius:6px;background:#e9f0fc;color:var(--accent);font-size:.8rem;font-weight:760}.decision-summary-item[data-decision-role="boundary"] strong{background:#fff0d4}.decision-summary-item[data-decision-role="next"] strong{background:#e7f2ec}.decision-summary-item p{margin:2px 0 0;font-size:.92rem;line-height:1.7;color:var(--ink)}.decision-summary-item[data-decision-role="boundary"] strong{color:var(--warn)}.decision-summary-item[data-decision-role="next"] strong{color:var(--good)}
+    .document-overview{margin:0 0 28px;padding:20px 24px;border:1px solid #cbd7e6;border-radius:14px;background:linear-gradient(135deg,#f8fbff,#fff);box-shadow:0 3px 12px #24304404}.document-overview .overview-kicker{margin:0 0 6px;color:var(--accent);font-size:.75rem;font-weight:700;letter-spacing:.1em}.document-overview h2{margin:0 0 8px}.document-overview .overview-lead{max-width:48em;margin:0 0 16px;font-size:1.03rem;font-weight:600}.overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.overview-grid>*{min-width:0;padding:12px 14px;border-left:2px solid #c6d8f2;background:#f8fafd;border-radius:0 8px 8px 0}.overview-grid h3{font-size:.86rem;margin:0 0 4px}.overview-grid p{margin:0;font-size:.87rem;line-height:1.6}
+    .split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}.split>*{min-width:0}.inset{background:#f4f6fa;border-radius:9px;padding:16px 18px;border:1px solid #e4e9f0}.inset p:last-child{margin-bottom:0}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:16px}.card{background:#fff;border:1px solid #e0e7f0;border-radius:9px;padding:16px;min-width:0}.card p{font-size:.92rem}.card p:last-child{margin-bottom:0}
+    .label{display:inline-block;font-size:.73rem;font-weight:650;color:var(--accent);background:#e9f0fc;border-radius:5px;padding:2px 7px;margin-bottom:9px}.keyword,.term{display:inline;padding:1px 5px;border-radius:4px;background:#fff1b8;color:#5f4600;font-weight:650;box-decoration-break:clone;-webkit-box-decoration-break:clone}.keyword{border-bottom:2px solid #d4a72c}.term{background:#e8f1ff;color:#24508f;border-bottom:1px solid #8db2e3}mark{padding:1px 4px;border-radius:4px;background:#fff1b8;color:#5f4600;font-weight:650;box-decoration-break:clone;-webkit-box-decoration-break:clone}.good{--accent:var(--good)}.warn{--accent:var(--warn)}.danger{--accent:var(--danger)}.good .label{background:#e7f2ec}.warn .label{background:#fff0d4}.danger .label{background:#fbe8eb}
+    .callout{border-left:3px solid var(--accent);background:#f3f6fb;padding:14px 18px;margin:20px 0;border-radius:0 8px 8px 0;font-size:.92rem}.callout.warn{background:#fff8e9}.callout.danger{background:#fff1f3}.callout.good{background:#eef7f1}.callout>strong{color:var(--accent)}.callout p{margin:4px 0 0}
+    .rule-list{margin:0;display:grid}.rule-row{display:grid;grid-template-columns:140px minmax(0,1fr);gap:20px;padding:12px 0;border-bottom:1px solid #e6ebf2}.rule-row:first-child{padding-top:0}.rule-row:last-child{border-bottom:0;padding-bottom:0}.rule-row dt{font-weight:600}.rule-row dd{margin:0;color:var(--muted)}
+    details{border:1px solid #d5dfec;border-radius:10px;background:#f7f9fc;margin:18px 0 0;padding:0 16px;box-shadow:0 2px 8px #24304408}summary{cursor:pointer;font-weight:650;font-size:.9rem;padding:13px 0;color:#30445f;list-style-position:outside}summary::marker{color:var(--accent)}details[open]>summary{border-bottom:1px solid var(--line);margin-bottom:14px;color:var(--accent)}details>:last-child:not(summary){margin-bottom:16px}
+    .table-scroll,.diagram-canvas{max-width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:9px;background:var(--paper)}table{width:100%;border-collapse:collapse;font-size:.9rem;text-align:left}caption{text-align:left;padding:12px 14px;color:var(--muted);font-size:.8rem}th,td{padding:12px 14px;border-top:1px solid var(--line);vertical-align:top;min-width:7rem}th{background:#f0f4f9;font-weight:650}tbody th{background:#f8fafd}
+    figure{margin:0 0 20px}figcaption{font-size:.9rem;font-weight:500;margin-bottom:12px;color:var(--muted)}.diagram-status{color:var(--muted);font-size:.83rem}.diagram-canvas{padding:18px;background:#fafbfd}.diagram-canvas svg{display:block;min-width:32rem;max-width:100%;height:auto;margin:auto}
+    pre{font:.82rem/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-x:auto;background:#eef2f7;padding:14px;border-radius:7px;white-space:pre;max-width:100%;margin:12px 0}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    /* Structural fallbacks also serve intentionally continuous prose. */
+    .document-body>h2,.document-body>section:not(.section-panel)>h2{margin:32px 0 14px}
+    .document-body>p,.document-body>section:not(.section-panel)>p{max-width:42em}
+    .option-detail+.option-detail{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+    .option-detail{scroll-margin-top:24px}.option-detail>p{max-width:42em}
+    :lang(en) .prose,:lang(en) .takeaway,:lang(en) .lead{max-width:72ch}
+    @media screen and (min-width:1200px){main:has(.document-layout.is-tab-reading){max-width:1360px;padding-right:32px}}
+    footer{max-width:1120px;margin:12px auto 0;border-top:1px solid var(--line);padding-top:16px;font-size:.8rem;color:var(--muted)}[hidden]{display:none!important}
+    @media(max-width:900px){main{padding:24px 18px 36px}.document-body{max-width:none}.toc{right:14px;bottom:74px;max-height:calc(100vh - 88px)}.toc-fab{right:14px;bottom:14px}.section-panel{scroll-margin-top:16px}}
+    @media(max-width:600px){body{font-size:16px}.document-header{margin-bottom:16px;padding-bottom:18px}.section-head{padding:16px;gap:10px}.section-body{padding:18px 16px}.section-head p{font-size:.82rem}.section-head h2{font-size:1.13rem}.section-index{height:30px;flex-basis:30px}.cards,.split,.overview-grid{grid-template-columns:minmax(0,1fr)}.split{gap:18px}.rule-row{grid-template-columns:100px minmax(0,1fr);gap:12px}.takeaway{font-size:1.04rem}.card{padding:14px}.callout{padding:12px 14px}.document-overview{padding:18px 16px}.decision-summary{padding:6px 14px}.decision-summary-item{grid-template-columns:92px minmax(0,1fr);gap:12px;padding:10px 0}.toolbar{justify-content:flex-start}.mode-switch{min-width:0;width:100%;max-width:300px}.hil-tablist [role="tab"]{padding-inline:12px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.toc{transition:none}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="document-header">
+    
+    <h1>Littp v1 需求、方案与开发计划</h1>
+    <p class="lead">首次设置用基础信息和短句互译生成种子熟词表；学习视图是连续英文加括号释义，释义只覆盖被标注单位。</p>
+    <p class="meta">2026-09-15 晚 · 初始设置加入短句互译</p>
+  </header>
+  <div class="document-layout">
+  <!-- Use nav.toc for long documents; remove for short documents. -->
+  <nav class="toc" data-hil-tab-toc hidden aria-label="文档目录"><strong>阅读目录</strong><ul><li><a href="#direction"><span aria-hidden="true">01</span>先给方向</a></li><li><a href="#requirements"><span aria-hidden="true">02</span>最终需求</a></li><li><a href="#out-of-scope"><span aria-hidden="true">03</span>明确不做</a></li><li><a href="#architecture"><span aria-hidden="true">04</span>技术方案</a></li><li><a href="#decisions"><span aria-hidden="true">05</span>技术取舍</a></li><li><a href="#plan"><span aria-hidden="true">06</span>开发计划</a></li><li><a href="#verify"><span aria-hidden="true">07</span>验收与回看</a></li></ul></nav>
+  <div class="document-body">
+  <div class="toolbar" aria-label="阅读操作" hidden>
+    <div class="mode-switch-wrap">
+      <div class="mode-switch" role="radiogroup" aria-label="阅读模式" data-active="tab">
+        <span class="mode-switch-thumb" aria-hidden="true"></span>
+        <button type="button" role="radio" data-action="tab-mode" data-mode="tab" data-mode-control aria-checked="true">Tab 模式</button>
+        <button type="button" role="radio" data-action="long-mode" data-mode="long" data-mode-control aria-checked="false">长文模式</button>
+      </div>
+      <span class="mode-recommendation" data-mode-recommendation hidden></span>
+    </div>
+    <button type="button" data-action="expand" data-detail-control hidden>展开全部细节</button>
+    <button type="button" data-action="collapse" data-detail-control hidden>收起全部细节</button>
+    <button type="button" data-action="copy">复制当前内容</button>
+  </div>
+  <section class="hil-tabs" data-hil-tabs="" data-recommended-mode="long" aria-label="章节阅读"><div class="hil-tablist" role="tablist" aria-label="章节"><button type="button" role="tab" id="hil-tab-1" aria-controls="direction" aria-selected="true">先给方向</button><button type="button" role="tab" id="hil-tab-2" aria-controls="requirements" aria-selected="false">最终需求</button><button type="button" role="tab" id="hil-tab-3" aria-controls="out-of-scope" aria-selected="false">明确不做</button><button type="button" role="tab" id="hil-tab-4" aria-controls="architecture" aria-selected="false">技术方案</button><button type="button" role="tab" id="hil-tab-5" aria-controls="decisions" aria-selected="false">技术取舍</button><button type="button" role="tab" id="hil-tab-6" aria-controls="plan" aria-selected="false">开发计划</button><button type="button" role="tab" id="hil-tab-7" aria-controls="verify" aria-selected="false">验收与回看</button></div><div class="hil-tabpanels"><section class="section-panel" id="direction" data-hil-no-tabs="true" aria-labelledby="hil-tab-1" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">01</span>
+    <div>
+      <h2 id="direction-title">先给方向</h2>
+      <p>Littp v1 是 Chrome 扩展：把中英文网页变成刚够看懂的英文。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>v1：首次设置采集基础信息并做短句互译，由 AI 生成种子熟词表；学习视图是连续英文，生词或短语后紧跟全角括号中文。翻译释义只覆盖被标注单位。一键回到处理前原文。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方确认名称、Chrome、DeepSeek、同一英文视角、原文语义、两段正确样例，以及单靠学历和工作经历很难判断水平，需要短句互译作补充信号。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>这里还没有代码和实测。等待时长、中文页英译、种子词表误伤，都要等原型验证。成本不作约束，但首屏等待仍算体验失败。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>按第 6 章分期：先骨架和初始设置，再英文页学习视图。不要并行做划词和润色。</p></div>
+    </div>
+    <p class="takeaway">这份文档把产品判断收成需求，把需求收成可写的技术方案和开发计划。它不是已验证的实现。</p>
+    <div class="split">
+      <article>
+        <h3>已确认的用户判断</h3>
+        <p>主收益是读懂英文，不是会说。</p>
+        <p>中文页和英文页都进入同一学习视图：英文句子 + <code>单位（中文）</code>。</p>
+        <p>切原文 = 不看处理后的英文，回到处理前页面。中文页样例里的中文段是原文，不是默认并排展示。</p>
+        <p>首次用基础信息加短句互译生成种子熟词表，减少前期把常见词标成生词。</p>
+      </article>
+      <aside class="inset">
+        <h3>仍是分析草稿或假设</h3>
+        <p>Translation Agent 应是确定流水线，不是自由规划的对话 Agent。</p>
+        <p>难度只改变熟词门槛，不改写句子。</p>
+        <p>短语如何切分（如 <code>regardless of</code>）尚未用代码验证。</p>
+        <p>十几句互译只能校正档位，推不出完整个人词表；忘了的课标词仍可能被当成熟词。</p>
+      </aside>
+    </div>
+  </div>
+</section><section class="section-panel" id="requirements" aria-labelledby="hil-tab-2" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">02</span>
+    <div>
+      <h2 id="requirements-title">最终需求</h2>
+      <p>v1 只服务中文母语、目标英语的阅读增强。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>首次打开先完成初始设置。之后默认学习视图：英文不断；看不懂的词或短语后紧跟 <code>（中文释义）</code>。难度只决定有多少单位被标注。随时回到处理前原文。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方给出的英文页和中文页样例都是这个形态。常见词被当成生词会毁掉信任。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>只覆盖网页正文阅读。不承诺口语、听力、视频、任意语种。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>实现时按用户故事验收，不要把后置功能提前做进默认路径。</p></div>
+    </div>
+    <h3>用户与场景</h3>
+    <div class="rule-list">
+      <div class="rule-row"><span>首次设置</span><span>采集基础信息 + 短句互译；AI 分析后生成种子熟词表</span></div>
+      <div class="rule-row"><span>使用者</span><span>母语中文、想增强英语阅读的人</span></div>
+      <div class="rule-row"><span>英文网页</span><span>保留英文原文，只在生词/短语后插入中文释义</span></div>
+      <div class="rule-row"><span>中文网页</span><span>先译成英文，再套同一套标注；默认不并排显示中文原文</span></div>
+      <div class="rule-row"><span>疲劳</span><span>调低难度（更多词当生词、中文更多），或一键回原文</span></div>
+    </div>
+    <h3>默认体验</h3>
+    <p>标注单位可以是词，也可以是短语。中文用全角括号，紧跟在英文单位之后，不打断英文阅读顺序。下面两段是目标效果，实现应对齐它们。</p>
+    <div class="inset">
+      <h3>英文页学习视图</h3>
+      <p>I woke up early, made a pot of tea, and watched the rain. The sky was grey, but the air felt refreshingly cool（清凉宜人）. The rain had eased（减弱）, so I decided to go out, regardless of（不管） the weather. The streets were empty, and the world seemed oddly peaceful（出奇地平静）. Sometimes, what we need isn't a plan but a pause（停顿）.</p>
+    </div>
+    <p>中文页先变成英文，再套同一套标注。下面第一段是处理前原文；第二段才是学习视图。点原文，回到第一段，而不是再生成一份中文译文。</p>
+    <div class="inset">
+      <h3>中文页：原文</h3>
+      <p>周二傍晚，我关掉电脑，沿着河堤慢慢走。天色渐暗，路灯一盏盏亮起。我忽然明白，生活的意义并不总在远方，它常常藏在那些不起眼的日常里。我们需要的，也许只是驻足片刻，重新打量身边的世界。</p>
+      <h3>中文页：学习视图</h3>
+      <p>On Tuesday evening, I turned off my computer and walked slowly along the riverside path（河堤）. The sky dimmed（渐渐暗下来）, and the streetlights flickered on（一盏盏亮起） one by one. It dawned on me that...（我忽然明白……） the meaning of life is not always far away; it often lies hidden in（藏在） those inconspicuous（不起眼的） everyday moments. What we need, perhaps, is just to linger（驻足） for a moment and reexamine（重新打量） the world around us.</p>
+    </div>
+    <h3>初始设置</h3>
+    <p>安装后先进入设置页，不先改网页。先填基础信息，再做一组短句互译，两者一起交给 AI 分析，得到种子熟词表后再进入学习视图。单靠学历和工作经历很难判断真实水平；互译用来校正档位，不是用来推出用户会的每一个词。</p>
+    <div class="rule-list">
+      <div class="rule-row"><span>学历</span><span>如初中 / 高中 / 本科 / 研究生</span></div>
+      <div class="rule-row"><span>英语等级</span><span>如中考、高考、四级、六级、雅思、托福，可多选或填无</span></div>
+      <div class="rule-row"><span>成绩</span><span>可选；有则帮助估计档位，没有也能生成</span></div>
+      <div class="rule-row"><span>工作使用频率</span><span>几乎不用 / 偶尔读 / 经常读英文材料</span></div>
+      <div class="rule-row"><span>短句互译</span><span>约 10–12 句；分 5–6 档难度，每档约 2 句；英译中和中译英各半</span></div>
+    </div>
+    <p>题库预置在扩展内，短句即可，不现场让模型出题。评分看意思是否到位，不按「信雅达」扣分。生成结果是种子：功能词和高频词仍由打包词表托底。用户之后可用难度调节；生成失败或跳过测验时退回「画像 + 托底词表」，设置页可重做。</p>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="v1 功能范围">
+      <table>
+        <caption>v1 要交付的能力</caption>
+        <thead>
+          <tr>
+            <th scope="col">能力</th>
+            <th scope="col">行为</th>
+            <th scope="col">验收</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">学习视图</th>
+            <td>英文不断；生词/短语后跟 <code>（中文）</code></td>
+            <td>能复现两段目标样例；<code>this</code> 无括号</td>
+          </tr>
+          <tr>
+            <th scope="row">初始设置</th>
+            <td>采集基础信息 + 短句互译，AI 生成种子熟词表</td>
+            <td>完成后有本地词表；<code>this</code> / <code>please</code> 不当生词；失败可退回托底词表</td>
+          </tr>
+          <tr>
+            <th scope="row">原文</th>
+            <td>恢复处理前 DOM</td>
+            <td>英页回英文原文，中页回中文原文，无需再生成</td>
+          </tr>
+          <tr>
+            <th scope="row">难度</th>
+            <td>只改变熟词门槛</td>
+            <td>调高后中文变少、英文变多，句子结构不被改写</td>
+          </tr>
+          <tr>
+            <th scope="row">站点控制</th>
+            <td>可对当前站开关</td>
+            <td>关闭后不再改写，原文可恢复</td>
+          </tr>
+          <tr>
+            <th scope="row">密钥</th>
+            <td>用户自备 DeepSeek API Key</td>
+            <td>只存在扩展存储，不进内容脚本明文请求日志</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section><section class="section-panel" id="out-of-scope" aria-labelledby="hil-tab-3" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">03</span>
+    <div>
+      <h2 id="out-of-scope-title">明确不做</h2>
+      <p>这些项已经讨论过，v1 故意排除。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>v1 不做视频、多语种、划词翻译、全文润色、旧代码迁移。初始设置包含短句互译，但不宣称测完就知道用户的全部词汇。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>产品方已逐项确认后置或放弃。旧公开产品里，这些能力会拖慢首体验或让选词失控。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>若原型证明学习视图经常读不完，再启动划词，而不是先做全文中文。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>评审或开发中出现这些需求，先对照本章，默认拒绝进 v1。</p></div>
+    </div>
+    <div class="rule-list">
+      <div class="rule-row"><span>视频</span><span>用量少，已停做</span></div>
+      <div class="rule-row"><span>划词翻译</span><span>解决学习视图局部看不懂，后做</span></div>
+      <div class="rule-row"><span>全文润色</span><span>会改写已打标的词，破坏词表控制</span></div>
+      <div class="rule-row"><span>多语种</span><span>不是加一个列表；词表和分词都会分叉</span></div>
+      <div class="rule-row"><span>长篇入学考试</span><span>不做几十题或现场出题；短句互译控制在十几句</span></div>
+      <div class="rule-row"><span>Firefox / Safari / iOS</span><span>第一版只做 Chrome</span></div>
+    </div>
+  </div>
+</section><section class="section-panel" id="architecture" aria-labelledby="hil-tab-4" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">04</span>
+    <div>
+      <h2 id="architecture-title">技术方案</h2>
+      <p>Chrome MV3 扩展 + 确定流水线 + DeepSeek 翻译步骤。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>两个 Agent 职责分开：设置页根据画像和互译答卷选档生成种子熟词表；阅读时 Translation Agent 只给已切好单位做中文释义。页面上谁是熟词，仍由代码对照词表决定。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>DeepSeek 官方 Chat Completions 与 OpenAI 兼容，当前模型 ID 为 <code>deepseek-flash</code> 与 <code>deepseek-v4-pro</code>。JSON Output 可用。思考模式默认开启，翻译应显式关闭，否则等待变长。<a href="https://api-docs.deepseek.com/guides/first_api_call">官方首次调用说明</a></p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>扩展直连 DeepSeek，密钥在用户本机。种子词表会漏掉遗忘词。正文提取在复杂站点上会失败，需可禁用站点。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>先落设置页和词表存储，再打通英文页学习视图。</p></div>
+    </div>
+    <figure class="diagram" aria-labelledby="pipeline-caption">
+      <figcaption id="pipeline-caption">先快照原文，再检测语种、词表打标，最后才调用 DeepSeek。模型不负责决定熟词。</figcaption>
+      <p class="diagram-status" role="status">图示尚未加载；可阅读上方说明或展开源码。</p>
+      <div class="diagram-canvas" role="img" aria-label="Littp v1 处理流水线" hidden></div>
+      <details class="diagram-source"><summary>查看图示源码</summary>      <pre><code>flowchart LR
+    A[正文] --&gt; B[快照] --&gt; C[语种] --&gt; D{中文?}
+    D --&gt;|是| E[英译]
+    D --&gt;|否| F[留英]
+    E --&gt; G[打标]
+    F --&gt; G
+    G --&gt; H[译生词] --&gt; I[学习视图] --&gt; J[回原文]</code></pre></details>
+    </figure>
+    <h3>扩展结构</h3>
+    <div class="cards">
+      <article class="card">
+        <h3>content script</h3>
+        <p>抽取正文、保存原文快照、渲染学习视图、处理原文切换。不持有 API Key，不直连 DeepSeek。</p>
+      </article>
+      <article class="card">
+        <h3>service worker</h3>
+        <p>Translation Agent：排队、调用 DeepSeek、回写结果。失败时保留原文可恢复。</p>
+      </article>
+      <article class="card">
+        <h3>popup / options</h3>
+        <p>填写 DeepSeek Key、初始设置（画像 + 短句互译）、难度、当前站开关。Key 与词表存 <code>chrome.storage.local</code>。</p>
+      </article>
+      <article class="card">
+        <h3>lexicon</h3>
+        <p>打包功能词和课标/词频档。AI 只决定覆盖哪些档，并允许少量补充词；代码合并成个人种子表。</p>
+      </article>
+    </div>
+    <h3>DeepSeek 用法</h3>
+    <p>Base URL：<code>https://api.deepseek.com</code>。v1 默认模型：<code>deepseek-flash</code>。翻译请求关闭思考：<code>thinking: { type: "disabled" }</code> 或 <code>reasoning_effort: "none"</code>。需要结构化生词表时使用 <code>response_format: { type: "json_object" }</code>，并在提示词里要求 JSON，避免空输出或死循环空白。<a href="https://api-docs.deepseek.com/guides/json_mode">JSON 模式说明</a></p>
+    <p>三次模型职责分开：设置页根据画像和互译答卷选择词表档位；中文页段落英译；已确定的生词/短语出中文释义。互译题本身预置，不让模型现场出题。不要一次让模型同时改写全文并决定熟词。</p>
+    <h3>初始熟词表怎么生成</h3>
+    <p>不要求模型从零默写用户会的每一个词。设置页把学历、等级、成绩、工作频率，以及约 10–12 句短句互译答卷一起交给 AI。AI 输出覆盖档位（如初中、高中、大学核心）和可选的少量补充词；代码把对应打包词表与功能词、高频词合并，写入本地熟词表。这是种子，阅读时仍用代码匹配。</p>
+    <p>互译只校正档位。十几句测不出完整阅读词表，也不能推翻功能词托底。答卷与画像冲突时，以答卷下调档位，不以画像硬抬档位。</p>
+    <h3>短句互译题库</h3>
+    <p>题库打包进扩展，固定题面，避免每次安装难度漂移。短句、日常语境即可，不考长难句翻译课。英译中主要看读懂没有；中译英看意思对不对，不扣文采。</p>
+    <div class="rule-list">
+      <div class="rule-row"><span>规模</span><span>约 10–12 题；5–6 档难度，每档约 2 题</span></div>
+      <div class="rule-row"><span>方向</span><span>每档一题英译中、一题中译英</span></div>
+      <div class="rule-row"><span>档位建议</span><span>小学 / 初中 / 高中 / 四级 / 六级 / 专业或学术，实现时可微调命名</span></div>
+      <div class="rule-row"><span>评分</span><span>AI 按档给对错或半对；输出仍是覆盖档位，不是逐词清单</span></div>
+    </div>
+    <h3>翻译 Agent Prompt 规则</h3>
+    <p>下列规则写入翻译步骤的 system prompt。输入是已切好的英文单位和所在句子；输出只允许该单位的中文释义。</p>
+    <div class="rule-list">
+      <div class="rule-row"><span>只覆盖本单位</span><span>括号里的中文必须且仅解释紧挨其前的英文单位，不解释前后词</span></div>
+      <div class="rule-row"><span>释义可独立读</span><span>拿掉英文后，中文应是完整词义或完整短语意义，不是更大句子里剪下来的残片</span></div>
+      <div class="rule-row"><span>不改边界</span><span>不扩大、不缩小给定 span，不把对比、否定、并列的另一半塞进这个单位</span></div>
+      <div class="rule-row"><span>不改写页面</span><span>不输出整句混排，不改英文原文</span></div>
+    </div>
+    <details>
+      <summary>查看可写入代码的 Prompt 条文</summary>
+      <pre><code>你只为给定英文单位提供简短中文释义。单位由调用方指定。
+- 释义必须且仅覆盖该单位。
+- 释义本身应能独立理解，对应完整词义或完整短语意义。
+- 不要把该单位之外的句法成分写进释义。
+- 不要翻译整句，不要改英文，不要增删单位边界。
+输出 JSON：{"items":[{"span":"...","gloss":"..."}]}
+gloss 不含括号、不含英文。</code></pre>
+    </details>
+    <h3>词表规则</h3>
+    <p>功能词和最高频约 2000 词默认熟词，任何难度下都不当生词。难度只移动门槛之上的词：更易则更多单位带 <code>（中文）</code>；更难则更多词保持纯英文。匹配用分词加词形还原，不把 <code>This</code> 和 <code>this</code> 当成两种词。</p>
+    <h3>渲染规则</h3>
+    <div class="rule-list">
+      <div class="rule-row"><span>主文本</span><span>始终是英文；中文只出现在括号里，不替换英文</span></div>
+      <div class="rule-row"><span>括号</span><span>全角 <code>（）</code>，紧跟标注单位，中间不插空格</span></div>
+      <div class="rule-row"><span>单位</span><span>可以是词或短语，如 <code>eased</code>、<code>regardless of</code>、<code>It dawned on me that</code></span></div>
+      <div class="rule-row"><span>密度</span><span>默认稀疏：大部分句子无括号，只标看不懂的单位</span></div>
+    </div>
+    <p>短语切分仍是待验证假设。v1 先用词表加常见多词表达（MWE）合并相邻单位，再把整段单位交给 DeepSeek 出一条中文释义。不要让模型自己决定哪些词该标。</p>
+    <details>
+      <summary>查看建议的仓库目录</summary>
+      <pre><code>extension/
+  manifest.json
+  background/agent.js
+  background/deepseek.js
+  content/extract.js
+  content/render.js
+  content/original.js
+  lexicon/function-words.json
+  lexicon/frequent-2000.json
+  lexicon/placement-items.json
+  popup/
+  options/
+  onboarding/</code></pre>
+    </details>
+  </div>
+</section><section class="section-panel" id="decisions" aria-labelledby="hil-tab-5" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">05</span>
+    <div>
+      <h2 id="decisions-title">技术取舍</h2>
+      <p>这些选择应进入以后的编码上下文，而不是再争论产品口号。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>选确定流水线；页面熟词用代码匹配种子词表；翻译释义只覆盖给定单位；初始熟词表由画像加短句互译映射到打包词表，不让模型从零默写全表，也不让十几句测出全部词汇；选直连 DeepSeek；选 DOM 快照回原文。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>常见词误判来自把选词交给模型。原文已被定义为处理前页面，本机快照即可。v1 没有账号体系，后端会额外增加范围。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>若密钥不能放在客户端，或需要统一计费，再引入后端。那会重开安全与架构。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>编码时遇到「让模型更聪明一点」的冲动，先对照本表被否决的方案。</p></div>
+    </div>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="v1 技术决策">
+      <table>
+        <caption>当前决策、被否决方案、重开信号</caption>
+        <thead>
+          <tr>
+            <th scope="col">问题</th>
+            <th scope="col">当前决策</th>
+            <th scope="col">否决的方案</th>
+            <th scope="col">重开条件</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">释义怎么写</th>
+            <td>只解释给定单位；释义可独立理解</td>
+            <td>把单位之外的句法成分写进括号</td>
+            <td>抽检时括号中文无法单独对应其前的英文单位</td>
+          </tr>
+          <tr>
+            <th scope="row">学习视图长什么样</th>
+            <td>英文后插全角括号中文</td>
+            <td>中文替换英文；上下双语对照；ruby / 划词气泡作为默认</td>
+            <td>括号密度让句子读不下去，且调难度仍失败</td>
+          </tr>
+          <tr>
+            <th scope="row">初始熟词表</th>
+            <td>画像 + 短句互译 → AI 选档 + 少量补充词 → 代码合并打包词表</td>
+            <td>只凭学历推断水平；模型从零默写全量熟词；或用十几句推出完整词表</td>
+            <td>本科且互译过关仍把功能词当生词，或把专业页几乎全部标成熟词</td>
+          </tr>
+          <tr>
+            <th scope="row">标注单位</th>
+            <td>词 + 词表内多词表达，整段交给 DeepSeek 出释义</td>
+            <td>让模型自由切短语并决定标哪些</td>
+            <td>样例中的 <code>regardless of</code> 被拆成两个括号，或整句被当成一个括号</td>
+          </tr>
+          <tr>
+            <th scope="row">谁决定页面熟词</th>
+            <td>代码对照种子词表</td>
+            <td>每页让模型再猜一遍哪些词该译</td>
+            <td>词表导致几乎没有生词，或专业页全是生词且无法调难度</td>
+          </tr>
+          <tr>
+            <th scope="row">Agent 形态</th>
+            <td>固定步骤编排器</td>
+            <td>多轮自主 tool-calling 改写页面</td>
+            <td>固定步骤无法处理的版式成为主路径</td>
+          </tr>
+          <tr>
+            <th scope="row">中文页如何变英文</th>
+            <td>段落级翻译后再打标</td>
+            <td>中英混排；或先整页中文再倒拼英文</td>
+            <td>英译后不可读，且调低难度仍失败</td>
+          </tr>
+          <tr>
+            <th scope="row">原文</th>
+            <td>处理前 DOM 快照</td>
+            <td>再生成一份「译文」当原文</td>
+            <td>快照在动态站点失效且无法恢复</td>
+          </tr>
+          <tr>
+            <th scope="row">模型</th>
+            <td><code>deepseek-flash</code>，关闭 thinking</td>
+            <td>默认思考模式；或用 Pro 做选词</td>
+            <td>关闭思考后翻译质量明显不可用</td>
+          </tr>
+          <tr>
+            <th scope="row">后端</th>
+            <td>v1 无服务端</td>
+            <td>自建代理与账号</td>
+            <td>必须统一密钥或计费</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>验证尚未发生。上表是讨论中的技术判断，不是测试结果。</p>
+  </div>
+</section><section class="section-panel" id="plan" aria-labelledby="hil-tab-6" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">06</span>
+    <div>
+      <h2 id="plan-title">开发计划</h2>
+      <p>按可演示切片推进，每期都要能回原文。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>先做扩展骨架，再做初始设置和种子词表，再做英文页学习视图，再做中文页英译，最后做难度。不要在学习视图可用前接入润色或划词。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>没有种子词表，英文页会把常见词标成生词。英文页不依赖「先译成英文」，能更早验证渲染。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>没有排工时。人员与每日可用时间未知。下列分期是依赖顺序，不是日历。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>从第 0 期开始建 Chrome MV3 仓库，跑通加载扩展、保存 Key、打开初始设置页。</p></div>
+    </div>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="分期计划">
+      <table>
+        <caption>分期目标与完成标准</caption>
+        <thead>
+          <tr>
+            <th scope="col">期</th>
+            <th scope="col">做完什么</th>
+            <th scope="col">完成标准</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">0 骨架</th>
+            <td>MV3、popup、Key 存储、正文抽取、原文快照</td>
+            <td>能加载扩展；开关后页面可恢复到处理前</td>
+          </tr>
+          <tr>
+            <th scope="row">1 初始设置</th>
+            <td>采集基础信息；预置短句互译；AI 选档并合并打包词表</td>
+            <td>完成后有一份本地种子熟词表；失败或跳过测验可退回托底表</td>
+          </tr>
+          <tr>
+            <th scope="row">2 英文页</th>
+            <td>语种检测、词表打标、DeepSeek 译生词、学习视图</td>
+            <td>对齐英文样例；<code>this</code> 无括号；可回原文</td>
+          </tr>
+          <tr>
+            <th scope="row">3 中文页</th>
+            <td>段落英译后再走第 2 期同一套打标</td>
+            <td>对齐中文页学习视图样例；回原文仍是中文</td>
+          </tr>
+          <tr>
+            <th scope="row">4 难度</th>
+            <td>三档门槛，只移动熟词边界</td>
+            <td>调档后中英文比例变化，句子不被改写</td>
+          </tr>
+          <tr>
+            <th scope="row">后置</th>
+            <td>划词翻译、润色、多语种</td>
+            <td>v1 验收通过后再开</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>每期都要守住的约束</h3>
+    <ul>
+      <li>模型失败时，用户仍能看到原文或回到原文。</li>
+      <li>不处理导航、侧栏、未展开区域；只改正文。</li>
+      <li>不把 API Key 打进内容页或远程日志。</li>
+    </ul>
+  </div>
+</section><section class="section-panel" id="verify" aria-labelledby="hil-tab-7" role="tabpanel">
+  <div class="section-head">
+    <span class="section-index" aria-hidden="true">07</span>
+    <div>
+      <h2 id="verify-title">验收与回看</h2>
+      <p>没有原型结果之前，不把方案写成已经有效。</p>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="decision-summary" data-hil-decision-summary aria-label="本章判断摘要">
+      <div class="decision-summary-item" data-decision-role="conclusion"><strong>当前结论</strong><p>v1 通过的最低标准是：初始设置能生成种子词表、英文页学习视图可读、常见词不被当生词、原文可恢复。未通过就不要扩功能。</p></div>
+      <div class="decision-summary-item" data-decision-role="evidence"><strong>主要依据</strong><p>这些标准直接对应本轮已锁判断，不依赖未做的划词和润色。</p></div>
+      <div class="decision-summary-item" data-decision-role="boundary"><strong>适用边界</strong><p>尚未有测试数据。站点兼容性失败只能证明该站需禁用，不能单独推翻产品契约。</p></div>
+      <div class="decision-summary-item" data-decision-role="next"><strong>下一步</strong><p>第 1 期完成后检查种子词表；第 2 期用一篇英文正文对照目标样例验收。</p></div>
+    </div>
+    <ul>
+      <li>支持：学习视图对齐两段目标样例；<code>this</code> 无括号；切原文立即回到处理前。</li>
+      <li>支持：本科画像且互译过关后，功能词和初高中核心词默认不标注；画像偏高而互译明显偏低时，档位应下调。</li>
+      <li>释义失败：括号中文无法单独对应其前的英文单位。</li>
+      <li>推翻默认路径：必须靠模型才能挡住功能词；或回原文需要再请求翻译。</li>
+      <li>修正难度设计：调档导致句子被改写，而不是词数变化。</li>
+      <li>可沉底：Ries 旧实现、视频、自主 Agent、一次提示词出混排、长篇入学考试。</li>
+    </ul>
+    <div class="inset">
+      <h3>这份记录应留下什么</h3>
+      <p>长期有用的是契约和取舍：Littp v1 卖刚够看懂的英文；标注形态是 <code>英文（中文）</code>；释义只覆盖被标注单位；初始熟词表是画像加短句互译得到的种子，页面匹配仍用代码；原文是快照。</p>
+    </div>
+  </div>
+</section></div></section>
+  </div>
+  </div>
+  
+</main>
+<script>
+(() => {
+  const tabGroups = [];
+  let setTocMode = () => {};
+  const layout = document.querySelector('.document-layout');
+  let currentMode = 'long';
+  const setTabMode = expanded => {
+    tabGroups.forEach(item => {
+      item.group.classList.toggle('is-ready', !expanded);
+      item.group.classList.toggle('is-expanded', expanded);
+      if (expanded) item.panels.forEach(panel => { panel.hidden = false; });
+      else item.activate(item.index, false);
+    });
+  };
+  const setReadingMode = mode => {
+    if (mode === 'tab' && !tabGroups.length) mode = 'long';
+    currentMode = mode;
+    const longMode = mode === 'long';
+    layout?.classList.toggle('is-long-reading', longMode);
+    layout?.classList.toggle('is-tab-reading', mode === 'tab');
+    document.querySelectorAll('details').forEach(item => item.open = longMode);
+    setTabMode(longMode);
+    setTocMode(longMode);
+    const switcher = document.querySelector('.mode-switch');
+    switcher?.setAttribute('data-active', mode);
+    switcher?.querySelectorAll('[role="radio"]').forEach(button => {
+      button.setAttribute('aria-checked', String(button.dataset.mode === mode));
+    });
+    const copyButton = document.querySelector('[data-action="copy"]');
+    if (copyButton) copyButton.textContent = '复制当前内容';
+  };
+  const fallbackCopy = text => {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '0';
+    area.style.left = '-9999px';
+    area.style.width = '1px';
+    area.style.height = '1px';
+    document.body.appendChild(area);
+    area.focus({preventScroll:true});
+    area.select();
+    area.setSelectionRange(0, area.value.length);
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch {}
+    area.remove();
+    return copied;
+  };
+  const copyCurrentView = async () => {
+    const body = document.querySelector('.document-body');
+    if (!body) return;
+    body.querySelectorAll('*').forEach((node, index) => node.setAttribute('data-hil-copy-key', String(index)));
+    const clone = body.cloneNode(true);
+    if (!clone) return;
+    clone.querySelectorAll('.toolbar,[hidden]').forEach(node => node.remove());
+    clone.querySelectorAll('details:not([open]) > *:not(summary)').forEach(node => node.remove());
+    clone.querySelectorAll('*').forEach(node => {
+      const source = document.querySelector(`[data-hil-copy-key=\"${node.getAttribute('data-hil-copy-key')}\"]`);
+      if (!source) return;
+      const computed = getComputedStyle(source);
+      node.style.cssText = Array.from(computed).map(name => `${name}:${computed.getPropertyValue(name)};`).join('');
+    });
+    const text = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+    clone.querySelectorAll('[data-hil-copy-key]').forEach(node => node.removeAttribute('data-hil-copy-key'));
+    const html = clone.innerHTML;
+    let copied = false;
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({'text/html': new Blob([html], {type:'text/html'}), 'text/plain': new Blob([text], {type:'text/plain'})})]);
+        copied = true;
+      } catch {}
+    }
+    if (!copied && navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(text); copied = true; } catch {}
+    }
+    if (!copied) copied = fallbackCopy(text);
+    const button = document.querySelector('[data-action="copy"]');
+    if (!button) return;
+    const original = button.textContent;
+    button.textContent = copied ? '已复制当前内容' : '复制失败，请手动选择';
+    setTimeout(() => { button.textContent = original; }, 1800);
+  };
+  document.querySelectorAll('[data-hil-tab-prev],[data-hil-tab-next],[data-hil-tab-status]').forEach(node => node.remove());
+  document.querySelectorAll('[data-hil-tabs]').forEach(group => {
+    const tabs = Array.from(group.querySelectorAll('[role="tab"]'));
+    const panels = Array.from(group.querySelectorAll('[role="tabpanel"]'));
+    const tablist = group.querySelector('[role="tablist"]');
+    if (!tablist || tabs.length < 2 || tabs.length !== panels.length) return;
+    const item = {group, tabs, panels, index:0, activate:null};
+    const activate = (index, focus) => {
+      item.index = (index + tabs.length) % tabs.length;
+      tabs.forEach((tab, i) => {
+        const active = i === item.index;
+        tab.setAttribute('aria-selected', String(active));
+        tab.setAttribute('tabindex', active ? '0' : '-1');
+        panels[i].hidden = !active;
+      });
+      if (focus) tabs[item.index].focus();
+    };
+    item.activate = activate;
+    group.classList.add('is-ready');
+    activate(0, false);
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activate(index, false));
+      tab.addEventListener('keydown', event => {
+        let next = null;
+        if (event.key === 'ArrowRight') next = index + 1;
+        if (event.key === 'ArrowLeft') next = index - 1;
+        if (event.key === 'Home') next = 0;
+        if (event.key === 'End') next = tabs.length - 1;
+        if (next === null) return;
+        event.preventDefault();
+        activate(next, true);
+      });
+    });
+    let startX = 0, startY = 0;
+    group.addEventListener('touchstart', event => {
+      if (event.touches.length === 1) {
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+      }
+    }, {passive:true});
+    group.addEventListener('touchend', event => {
+      if (!startX || event.changedTouches.length !== 1) return;
+      const endX = event.changedTouches[0].clientX;
+      const endY = event.changedTouches[0].clientY;
+      const dx = endX - startX, dy = endY - startY;
+      const blocked = event.target.closest('table, pre, code, a, button, input, textarea, select');
+      startX = startY = 0;
+      if (blocked || Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
+      activate(item.index + (dx < 0 ? 1 : -1), false);
+    }, {passive:true});
+    tabGroups.push(item);
+  });
+  const toolbar = document.querySelector('.toolbar');
+  if (toolbar) {
+    toolbar.hidden = false;
+    const hasTabs = tabGroups.length > 0;
+    const switcher = toolbar.querySelector('.mode-switch');
+    switcher?.setAttribute('data-options', '2');
+    toolbar.querySelectorAll('[data-detail-control]').forEach(button => button.hidden = true);
+    if (!hasTabs) switcher?.setAttribute('hidden', '');
+    const recommendation = toolbar.querySelector('[data-mode-recommendation]');
+    if (recommendation && hasTabs) { recommendation.hidden = false; recommendation.textContent = tabGroups[0].group.dataset.recommendedMode === 'long' ? '推荐长文' : '推荐 Tab'; }
+    const modes = hasTabs ? ['tab', 'long'] : ['long'];
+    switcher?.querySelectorAll('[role="radio"]').forEach(button => {
+      button.addEventListener('click', () => setReadingMode(button.dataset.mode));
+      button.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const index = modes.indexOf(button.dataset.mode);
+        const next = event.key === 'ArrowRight' ? index + 1 : index - 1;
+        const nextButton = switcher.querySelector(`[data-mode="${modes[(next + modes.length) % modes.length]}"]`);
+        nextButton?.focus();
+        setReadingMode(nextButton?.dataset.mode || modes[0]);
+      });
+    });
+    toolbar.addEventListener('click', event => {
+      const action = event.target.closest('button')?.dataset.action;
+      if (action === 'copy') copyCurrentView();
+    });
+  }
+  const toc = document.querySelector('.toc');
+  if (toc) {
+    toc.dataset.enhanced = 'true';
+    if (!toc.id) { let id = 'hil-toc', i = 2; while (document.getElementById(id)) id = 'hil-toc-' + i++; toc.id = id; }
+    const fab = document.createElement('button');
+    fab.type = 'button'; fab.className = 'toc-fab no-print';
+    fab.setAttribute('aria-label', '收起目录'); fab.title = '收起目录'; fab.textContent = '☰';
+    fab.setAttribute('aria-controls', toc.id);
+    document.body.appendChild(fab);
+    const setCollapsed = collapsed => {
+      toc.classList.toggle('is-collapsed', collapsed);
+      toc.hidden = collapsed;
+      toc.inert = collapsed;
+      fab.setAttribute('aria-expanded', String(!collapsed));
+      toc.setAttribute('aria-hidden', String(collapsed));
+      fab.setAttribute('aria-label', collapsed ? '展开目录' : '收起目录');
+      fab.title = collapsed ? '展开目录' : '收起目录';
+    };
+    fab.addEventListener('click', () => setCollapsed(!toc.classList.contains('is-collapsed')));
+    setTocMode = visible => {
+      if (tabGroups.length) {
+        fab.hidden = !visible;
+        setCollapsed(!visible);
+      } else {
+        fab.hidden = false;
+        setCollapsed(false);
+      }
+      layout?.classList.toggle('is-long-reading', visible && tabGroups.length > 0);
+      layout?.classList.toggle('is-tab-reading', !visible && tabGroups.length > 0);
+    };
+    setCollapsed(tabGroups.length > 0);
+    const entries = Array.from(toc.querySelectorAll('a[href^="#"]')).map(link => {
+      try { return { link, section:document.getElementById(decodeURIComponent(link.hash.slice(1))) }; }
+      catch { return { link, section:null }; }
+    }).filter(entry => entry.section);
+    const updateLocation = () => {
+      let current = entries[0];
+      for (const entry of entries) if (entry.section.getBoundingClientRect().top <= 160) current = entry;
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = entries.at(-1);
+      for (const entry of entries) {
+        if (entry === current) entry.link.setAttribute('aria-current', 'location');
+        else entry.link.removeAttribute('aria-current');
+      }
+    };
+    let queued = false;
+    window.addEventListener('scroll', () => {
+      if (!queued) { queued = true; requestAnimationFrame(() => { updateLocation(); queued = false; }); }
+    }, { passive:true });
+    window.addEventListener('resize', updateLocation);
+    updateLocation();
+    document.addEventListener('click', event => {
+      if (!toc.classList.contains('is-collapsed') && !toc.contains(event.target) && event.target !== fab && !event.target.closest('.mode-switch')) setCollapsed(true);
+    });
+  }
+  const recommendedMode = tabGroups[0]?.group.dataset.recommendedMode;
+  setReadingMode(recommendedMode || (tabGroups.length ? 'tab' : 'long'));
+  const revealHashTarget = () => {
+    let target;
+    try { target = document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch { return; }
+    if (!target) return;
+    const tabPanel = target.closest('[role="tabpanel"]');
+    if (tabPanel) {
+      const owner = tabGroups.find(item => item.panels.includes(tabPanel));
+      if (owner) owner.activate(owner.panels.indexOf(tabPanel), false);
+    }
+    let changed = false;
+    for (let node = target; node; node = node.parentElement) {
+      if (node.tagName === 'DETAILS' && !node.open) { node.open = true; changed = true; }
+    }
+    if (changed) target.scrollIntoView();
+  };
+  window.addEventListener('hashchange', revealHashTarget);
+  revealHashTarget();
+  const figures = Array.from(document.querySelectorAll('.diagram'));
+  if (!figures.length) return;
+  figures.forEach(figure => { const canvas = figure.querySelector('.diagram-canvas'); if (canvas) canvas.tabIndex = 0; });
+  const fail = figure => {
+    figure.dataset.rendered = 'false';
+    const canvas = figure.querySelector('.diagram-canvas');
+    if (canvas) { canvas.replaceChildren(); canvas.hidden = true; }
+    const status = figure.querySelector('.diagram-status');
+    if (status) { status.hidden = false; status.textContent = '图示暂时无法显示，请阅读图示说明；需要时可展开源码。'; }
+  };
+  async function render() {
+    let timer;
+    try {
+      const module = await Promise.race([
+        import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs'),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Diagram loading timeout')), 12000); })
+      ]);
+      clearTimeout(timer);
+      const mermaid = module.default;
+      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', suppressErrorRendering:true, theme:'base', themeVariables:{fontFamily:'-apple-system, BlinkMacSystemFont, PingFang SC, sans-serif',fontSize:'16px',primaryColor:'#edf3ff',primaryTextColor:'#243044',primaryBorderColor:'#7b99c3',lineColor:'#64748b',secondaryColor:'#edf5ef',tertiaryColor:'#f6f7f9'}, flowchart:{htmlLabels:false} });
+      for (const [index, figure] of figures.entries()) {
+        try {
+          const source = figure.querySelector('.diagram-source code').textContent;
+          const canvas = figure.querySelector('.diagram-canvas');
+          canvas.hidden = false;
+          const { svg } = await mermaid.render('readable-diagram-' + index, source, canvas);
+          canvas.innerHTML = svg;
+          figure.dataset.rendered = 'true';
+          figure.querySelector('.diagram-status').hidden = true;
+        } catch { fail(figure); }
+      }
+    } catch { figures.forEach(fail); }
+    finally { clearTimeout(timer); }
+  }
+  render();
+})();
+</script>
+</body>
+</html>

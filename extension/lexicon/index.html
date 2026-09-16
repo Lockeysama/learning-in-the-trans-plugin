@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Littp 词表</title>
+    <link rel="stylesheet" href="../ui.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">Littp</p>
+        <nav class="tabs" aria-label="页面">
+          <a href="../settings/index.html">翻译器设置</a>
+          <a href="index.html" class="is-current" aria-current="page">词表</a>
+          <a href="../debug/index.html">调试</a>
+        </nav>
+        <h1>词表</h1>
+        <p class="lead">按常见到不常见查看种子熟词。初始化评测也在这里完成。</p>
+      </header>
+
+      <p class="banner" id="keyBanner" hidden>还没有 API Key。请先填写后再做初始化。</p>
+
+      <section class="card" id="countsCard">
+        <h2>当前条数</h2>
+        <p class="hint">种子熟词是去重后的总数；下面分级之和等于这个数。本档更大的数字表示有词已出现在更常见档。</p>
+        <div class="counts" id="counts"></div>
+      </section>
+
+      <section class="card">
+        <h2>覆盖档位</h2>
+        <p class="hint">勾选会写入种子词表，不受阅读难度影响。改档不会清掉补充熟词和补充生词表。</p>
+        <div id="bands" class="chips"></div>
+      </section>
+
+      <section class="card">
+        <label for="knownQuery">搜索</label>
+        <input id="knownQuery" type="search" placeholder="过滤各档熟词" />
+        <div id="tiers"></div>
+        <h3>补充生词表</h3>
+        <p class="hint">划词选「我不知道这个词怎么翻译」，或从熟词点「移除」，都会进这里。这些词不再当成熟词，学习视图里会带释义。</p>
+        <ul class="word-list" id="unknownList"></ul>
+        <p class="status" id="lexiconStatus"></p>
+      </section>
+
+      <section class="card" id="init">
+        <h2>初始化</h2>
+        <p class="hint">学历和短句互译用来选档。密钥会写入翻译器设置。再次生成会保留你改过的补充熟词和生词。</p>
+        <form id="form">
+          <label for="education">学历</label>
+          <select id="education" name="education">
+            <option value="junior">初中</option>
+            <option value="senior">高中</option>
+            <option value="bachelor" selected>本科</option>
+            <option value="graduate">研究生</option>
+          </select>
+          <fieldset>
+            <legend>英语等级（可多选）</legend>
+            <label><input type="checkbox" name="levels" value="中考" /> 中考</label>
+            <label><input type="checkbox" name="levels" value="高考" /> 高考</label>
+            <label><input type="checkbox" name="levels" value="四级" /> 四级</label>
+            <label><input type="checkbox" name="levels" value="六级" /> 六级</label>
+            <label><input type="checkbox" name="levels" value="雅思" /> 雅思</label>
+            <label><input type="checkbox" name="levels" value="托福" /> 托福</label>
+            <label><input type="checkbox" name="levels" value="无" /> 无</label>
+          </fieldset>
+          <label for="score">成绩（可选）</label>
+          <input id="score" name="score" type="text" placeholder="如 四级 425 / 雅思 6.5" />
+          <label for="workFrequency">工作中阅读英文的频率</label>
+          <select id="workFrequency" name="workFrequency">
+            <option value="never">几乎不用</option>
+            <option value="sometimes" selected>偶尔读</option>
+            <option value="often">经常读</option>
+          </select>
+          <h3>短句互译</h3>
+          <div id="items"></div>
+          <div class="actions">
+            <button type="submit" id="submit">生成种子熟词表</button>
+            <button type="button" class="secondary" id="skip">跳过互译，只用基础信息</button>
+          </div>
+          <p class="status" id="status"></p>
+          <p class="motto" id="motto" hidden></p>
+        </form>
+      </section>
+    </main>
+    <div class="modal" id="keyGate" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+        <h2 id="gateTitle">填写 API Key</h2>
+        <p class="hint">DeepSeek 密钥只存在本机，会写入翻译器设置，之后不用再填一次。</p>
+        <label for="gateKey">API Key</label>
+        <input id="gateKey" type="password" autocomplete="off" />
+        <p class="status" id="gateStatus"></p>
+        <div class="actions">
+          <button type="button" id="gateSave">保存并开始评测</button>
+        </div>
+      </div>
+    </div>
+    <script src="lexicon.js" type="module"></script>
+  </body>
+</html>
