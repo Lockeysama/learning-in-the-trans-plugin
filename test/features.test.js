@@ -19,6 +19,7 @@ import { DEFAULT_GLOSS_STYLE, glossStyleToCss, normalizeGlossStyle } from "../ex
 import { upgradeCachedGlosses } from "../extension/content/render.js";
 import { indexMwes, tokenize } from "../extension/shared/tokenize.js";
 import { addUsage, emptyUsage, readUsage } from "../extension/shared/usage.js";
+import { BATCH_MAX_CHARS, BATCH_MAX_ITEMS, FRAGMENT_MAX_CHARS, packBatches, splitFragment } from "../extension/shared/chunks.js";
 
 test("selection becomes a draft lemma or phrase", () => {
   assert.equal(selectionToDraft("  Regardless of  "), "regardless of");
@@ -504,6 +505,26 @@ test("draft and lexicon reads are not queued behind model calls", () => {
   assert.equal(shouldQueueMessage("GET_LEXICON"), false);
   assert.equal(shouldQueueMessage("GET_STATE"), false);
   assert.equal(shouldQueueMessage("GLOSS"), true);
+});
+
+test("long blocks split by sentence then pack into bounded batches", () => {
+  const short = "The rain had eased.";
+  assert.deepEqual(splitFragment(short, 80), [short]);
+  const sentences = ["第一句要足够长才会被切开。", "第二句同样需要凑过阈值。", "第三句收尾。"];
+  const joined = sentences.join("");
+  const parts = splitFragment(joined, 12);
+  assert.ok(parts.length >= 2);
+  assert.equal(parts.join(""), joined);
+  const hard = "甲".repeat(50);
+  const sliced = splitFragment(hard, 20);
+  assert.equal(sliced.length, 3);
+  assert.equal(sliced.join(""), hard);
+  const packed = packBatches(["aaaa", "bbbb", "cccc", "dddd"], { maxItems: 2, maxChars: 100, textOf: (text) => text });
+  assert.equal(packed.length, 2);
+  assert.deepEqual(packed[0], ["aaaa", "bbbb"]);
+  const byChars = packBatches(["aaa", "bbb", "ccc"], { maxItems: 8, maxChars: 6, textOf: (text) => text });
+  assert.equal(byChars.length, 2);
+  assert.equal(FRAGMENT_MAX_CHARS > 0 && BATCH_MAX_CHARS > FRAGMENT_MAX_CHARS && BATCH_MAX_ITEMS > 1, true);
 });
 
 test("stale extension context asks the user to refresh", () => {

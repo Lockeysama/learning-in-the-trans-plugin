@@ -7,6 +7,7 @@ import {
   clearStoredPageCache,
   clearTargetCache,
   commitLearning,
+  copyProcessedHtml,
   discardWork,
   hasOriginal,
   hydratePageCache,
@@ -30,6 +31,7 @@ import {
   walkTextNodes,
 } from "./render.js";
 import { STORAGE_KEYS } from "../shared/constants.js";
+import { BATCH_MAX_CHARS, BATCH_MAX_ITEMS, FRAGMENT_MAX_CHARS, packBatches, splitFragment } from "../shared/chunks.js";
 import { explainRuntimeError, isStaleExtensionError, sendRuntime } from "../shared/messages.js";
 import { shouldAutoLearnPage } from "../shared/site.js";
 import { mountSelector } from "./select.js";
@@ -88,23 +90,42 @@ async function getStateWithRetry(opts = {}) {
   throw new Error(explainRuntimeError(lastError, lastError?.message || lastError || "无法读取扩展状态"));
 }
 
-async function translateChinese(target) {
-  const blocks = blockElements(target);
-  const paragraphs = blocks.map((el) => (el.innerText || el.textContent || "").trim());
-  if (!paragraphs.length) return;
-  log("translate paragraphs", paragraphs.length);
-  const translated = await sendRuntime({
-    type: "TRANSLATE_PARAS",
-    paragraphs,
-  });
-  if (translated?.error) throw new Error(translated.error);
-  blocks.forEach((el, index) => {
-    const next = translated[index];
-    if (next) el.textContent = next;
-  });
+async function translateChinese(target, { onBatch } = {}) {
+  const blocks = blockElements(target)
+    .map((el) => ({
+      el,
+      parts: splitFragment((el.innerText || el.textContent || "").trim(), FRAGMENT_MAX_CHARS),
+    }))
+    .filter((block) => block.parts.length);
+  if (!blocks.length) return;
+  const pieces = [];
+  for (const block of blocks) {
+    block.parts.forEach((text, index) => {
+      pieces.push({ block, index, text });
+    });
+  }
+  log("translate paragraphs", pieces.length, "in", blocks.length, "blocks");
+  for (const batch of packBatches(pieces, {
+    maxItems: BATCH_MAX_ITEMS,
+    maxChars: BATCH_MAX_CHARS,
+    textOf: (piece) => piece.text,
+  })) {
+    const translated = await sendRuntime({
+      type: "TRANSLATE_PARAS",
+      paragraphs: batch.map((piece) => piece.text),
+    });
+    if (translated?.error) throw new Error(translated.error);
+    const dirty = new Set();
+    batch.forEach((piece, index) => {
+      piece.block.parts[piece.index] = String(translated[index] || "").trim() || piece.text;
+      dirty.add(piece.block);
+    });
+    for (const block of dirty) block.el.textContent = block.parts.join("");
+    await onBatch?.();
+  }
 }
 
-async function annotateEnglish(target, knownLemmas, mwes, drafts) {
+async function annotateEnglish(target, knownLemmas, mwes, drafts, { onBatch } = {}) {
   const known = new Set(knownLemmas);
   const mweIndex = indexMwes(mwes || []);
   const nodes = walkTextNodes(target);
@@ -116,17 +137,26 @@ async function annotateEnglish(target, knownLemmas, mwes, drafts) {
       tokens: tokenize(node.nodeValue, { known, mweIndex, drafts }),
     };
   });
-  const items = uniqueUnknown(groups);
-  log("unknown units", items.length, items.slice(0, 12));
-  let glossMap = {};
-  if (items.length) {
-    const result = await sendRuntime({ type: "GLOSS", items });
-    if (result?.error) throw new Error(result.error);
-    glossMap = result || {};
-  }
-  ensureGlossStyle();
-  for (const group of groups) {
-    replaceTextNode(group.node, fragmentFromTokens(group.tokens, glossMap));
+  const batches = packBatches(groups, {
+    maxItems: BATCH_MAX_ITEMS,
+    maxChars: BATCH_MAX_CHARS,
+    textOf: (group) => group.node.nodeValue || "",
+    countOf: (group) => group.tokens.filter((token) => token.type === "unknown").length,
+  });
+  for (const batch of batches) {
+    const items = uniqueUnknown(batch);
+    log("unknown units", items.length, items.slice(0, 12));
+    let glossMap = {};
+    if (items.length) {
+      const result = await sendRuntime({ type: "GLOSS", items });
+      if (result?.error) throw new Error(result.error);
+      glossMap = result || {};
+    }
+    ensureGlossStyle();
+    for (const group of batch) {
+      replaceTextNode(group.node, fragmentFromTokens(group.tokens, glossMap));
+    }
+    await onBatch?.();
   }
 }
 
@@ -205,17 +235,20 @@ async function processTarget(target, state, { force = false, lexiconKey }) {
   try {
     const lang = detectLang(work.textContent || work.innerText || "");
     log("process", { lang, host: currentHost(), known: state.knownLemmas?.length });
-    if (lang === "zh") await translateChinese(work);
+    const flush = () => copyProcessedHtml(target, work);
+    if (lang === "zh") await translateChinese(work, { onBatch: flush });
     await annotateEnglish(
       work,
       state.knownLemmas || [],
       state.mwes || [],
       draftSet(state.extraUnknowns),
+      { onBatch: flush },
     );
     commitLearning(target, work);
     persistPageCache(sessionStore(), pageHref(), target, lexiconKey);
   } catch (error) {
     discardWork(work);
+    if (hasOriginal(target)) restore(target);
     throw error;
   }
   return { cached: false };
