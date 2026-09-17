@@ -14,6 +14,7 @@ import { mergePrompts, promptOverrides, PROMPT_META, validatePrompts } from "../
 import { pageHost, shouldAutoLearnPage } from "../shared/site.js";
 import { sendToTab } from "../shared/tab-bridge.js";
 import { normalizeGlossStyle } from "../shared/gloss-style.js";
+import { formatIpa, formatPronunciation } from "../shared/pronounce.js";
 import { emptyUsage, readUsage } from "../shared/usage.js";
 
 function ensureContextMenu() {
@@ -268,6 +269,34 @@ async function translateParagraphs(paragraphs) {
   );
 }
 
+async function pronounceItem(text, sentence = "") {
+  const key = selectionToDraft(text) || String(text || "").toLowerCase().trim();
+  if (!key) throw new Error("没有可用的英文词或短语");
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error("请先完成初始设置");
+  const prompts = await loadPrompts();
+  const payload = await callModel("pronounce", {
+    apiKey,
+    system: prompts.pronounce,
+    user: JSON.stringify({ text: key, sentence: String(sentence || "").slice(0, 280) }),
+    maxTokens: 220,
+  });
+  const ipa = formatIpa(payload.ipa || payload.phonetic);
+  if (!ipa) throw new Error("没有得到音标");
+  const ipaUk = formatIpa(payload.ipaUk);
+  const hint = String(payload.hint || payload.approx || "").trim();
+  const hintUk = String(payload.hintUk || "").trim();
+  return {
+    ok: true,
+    text: key,
+    ipa,
+    ipaUk,
+    hint,
+    hintUk,
+    message: formatPronunciation({ text: key, ipa, ipaUk, hint, hintUk }),
+  };
+}
+
 async function addUnknown(text) {
   const key = selectionToDraft(text) || String(text || "").toLowerCase().trim();
   if (!key) throw new Error("没有可用的英文词或短语");
@@ -513,6 +542,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return removeUnknown(message.text);
       case "ADD_KNOWN":
         return addKnown(message.text);
+      case "PRONOUNCE":
+        return pronounceItem(message.text, message.sentence);
       case "SET_BANDS":
         return setBands(message.bands);
       case "CLEAR_LOGS":

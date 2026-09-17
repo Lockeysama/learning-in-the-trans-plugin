@@ -577,6 +577,12 @@ if (!alreadyLoaded) {
       if (result?.error) return result;
       return { message: `已记下：很熟悉「${result.text || text}」` };
     },
+    onPronounce: async (text, sentence) => {
+      const result = await sendRuntime({ type: "PRONOUNCE", text, sentence });
+      log("pronounce", text, result);
+      if (result?.error) return result;
+      return { message: result.message || `${result.text}  ${result.ipa}` };
+    },
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

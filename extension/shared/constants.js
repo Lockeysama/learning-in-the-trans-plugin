@@ -63,3 +63,13 @@ export const SEED_SYSTEM = `你根据学习者画像和短句互译答卷，选�
 export const PARAGRAPH_SYSTEM = `把每段中文译成通顺、自然的英文。不要解释，不要编号，不要添加原文没有的信息。
 保持输入段落数量和顺序。
 输出 JSON：{"paragraphs":["English paragraph", "..."]}`;
+
+export const PRONOUNCE_SYSTEM = `你只为给定英文单位提供发音音标，并附一句母语近似读法。
+- 使用国际音标 IPA，宽式音标。
+- 默认美式发音；与英式明显不同时可同时给出英式。
+- 根据 sentence 消歧同形异音词。
+- hint 用简短汉字谐音近似美式读音，不要拼音，不要解释词义。
+- 谐音只求听感接近，可用短横分音节，例如「韦-德尔」。
+- 不要翻译，不要改英文单位。
+输出 JSON：{"text":"...","ipa":"/ˈwɛðər/","ipaUk":"","hint":"韦-德尔","hintUk":""}
+ipa、hint 必填；ipaUk、hintUk 没有明显英美差异时用空字符串。`;

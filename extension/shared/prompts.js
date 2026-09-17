@@ -1,6 +1,7 @@
 import {
   GLOSS_SYSTEM,
   PARAGRAPH_SYSTEM,
+  PRONOUNCE_SYSTEM,
   SEED_SYSTEM,
 } from "./constants.js";
 
@@ -8,12 +9,14 @@ export const DEFAULT_PROMPTS = {
   gloss: GLOSS_SYSTEM,
   seed: SEED_SYSTEM,
   translate: PARAGRAPH_SYSTEM,
+  pronounce: PRONOUNCE_SYSTEM,
 };
 
 export const PROMPT_JSON_EXAMPLES = {
   gloss: '{"items":[{"span":"...","gloss":"..."}]}',
   seed: '{"coverageBands":["junior","senior"],"extraLemmas":["nonetheless"]}',
   translate: '{"paragraphs":["English paragraph", "..."]}',
+  pronounce: '{"text":"...","ipa":"/ˈwɛðər/","ipaUk":"","hint":"韦-德尔","hintUk":""}',
 };
 
 export const PROMPT_META = [
@@ -32,6 +35,11 @@ export const PROMPT_META = [
     title: "中译英",
     hint: `把中文网页段落译成英文。可以改任务说明，但不要改输出 JSON 结构 ${PROMPT_JSON_EXAMPLES.translate}，否则会报错。`,
   },
+  {
+    id: "pronounce",
+    title: "发音音标",
+    hint: `划词「这个怎么读」时给出国际音标。可以改任务说明，但不要改输出 JSON 结构 ${PROMPT_JSON_EXAMPLES.pronounce}，否则会报错。`,
+  },
 ];
 
 const JSON_CHECKS = {
@@ -39,6 +47,8 @@ const JSON_CHECKS = {
     Array.isArray(obj?.items) && obj.items.some((item) => item && "span" in item && "gloss" in item),
   seed: (obj) => Array.isArray(obj?.coverageBands) && Array.isArray(obj?.extraLemmas),
   translate: (obj) => Array.isArray(obj?.paragraphs),
+  pronounce: (obj) =>
+    typeof obj?.ipa === "string" && obj.ipa.trim().length > 0 && typeof obj?.hint === "string",
 };
 
 export function jsonObjectsIn(text) {

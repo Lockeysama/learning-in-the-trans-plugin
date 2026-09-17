@@ -57,12 +57,19 @@ function ensureHost() {
       }
       button:hover { background: #1f3d3a; }
       .status { padding: 8px 12px; color: #9fe0ce; }
+      .status[data-kind="ipa"] {
+        color: #ecfccb;
+        font-size: 15px;
+        line-height: 1.55;
+        letter-spacing: 0.01em;
+      }
     </style>
     <div class="wrap" id="wrap" hidden>
       <div class="dot" id="dot" title="划词菜单"></div>
       <div class="menu" id="menu">
         <button type="button" id="addDraft">我不知道这个词怎么翻译</button>
         <button type="button" id="addKnown">这个词的意思我很熟悉了</button>
+        <button type="button" id="pronounce">这个怎么读</button>
         <div class="status" id="status" hidden></div>
       </div>
     </div>
@@ -88,29 +95,31 @@ export function selectionAnchor(selection, event) {
   const x = hasBox ? rect.right : event?.clientX;
   const y = hasBox ? rect.top : event?.clientY;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return { draft, x, y };
+  const sentence = String(node?.parentElement?.innerText || node?.parentElement?.textContent || selection.toString() || "").slice(0, 280);
+  return { draft, sentence, x, y };
 }
 
-export function mountSelector({ onAddDraft, onAddKnown }) {
+export function mountSelector({ onAddDraft, onAddKnown, onPronounce }) {
   const host = ensureHost();
   const root = host.shadowRoot;
   const wrap = root.getElementById("wrap");
   const menu = root.getElementById("menu");
   const status = root.getElementById("status");
   const dot = root.getElementById("dot");
-  let current = "";
+  let current = { text: "", sentence: "" };
   let pinned = false;
 
   function hide() {
     wrap.hidden = true;
     menu.classList.remove("open");
     status.hidden = true;
+    status.removeAttribute("data-kind");
     pinned = false;
-    current = "";
+    current = { text: "", sentence: "" };
   }
 
   function place(anchor) {
-    current = anchor.draft;
+    current = { text: anchor.draft, sentence: anchor.sentence || "" };
     wrap.hidden = false;
     wrap.style.left = `${Math.min(window.innerWidth - 28, Math.max(8, anchor.x + 6))}px`;
     wrap.style.top = `${Math.min(window.innerHeight - 28, Math.max(8, anchor.y - 6))}px`;
@@ -145,19 +154,21 @@ export function mountSelector({ onAddDraft, onAddKnown }) {
     menu.classList.add("open");
   });
 
-  async function runAction(handler) {
+  async function runAction(handler, { keepOpen = false, kind = "" } = {}) {
     if (!handler) return;
-    const text = current;
+    const { text, sentence } = current;
     if (!text) return;
     status.hidden = false;
+    status.removeAttribute("data-kind");
     status.textContent = "处理中…";
     pinned = true;
     menu.classList.add("open");
     try {
-      const result = await handler(text);
+      const result = await handler(text, sentence);
       status.textContent = result?.error ? result.error : result?.message || `已处理：${text}`;
       if (result?.error) return;
-      setTimeout(() => hide(), 700);
+      if (kind) status.dataset.kind = kind;
+      if (!keepOpen) setTimeout(() => hide(), 700);
     } catch (error) {
       status.textContent = explainRuntimeError(error);
     }
@@ -170,6 +181,10 @@ export function mountSelector({ onAddDraft, onAddKnown }) {
   root.getElementById("addKnown").addEventListener("click", (event) => {
     stopBubble(event);
     runAction(onAddKnown);
+  });
+  root.getElementById("pronounce").addEventListener("click", (event) => {
+    stopBubble(event);
+    runAction(onPronounce, { keepOpen: true, kind: "ipa" });
   });
 
   document.addEventListener("mouseup", (event) => {

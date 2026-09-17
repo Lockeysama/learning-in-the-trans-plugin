@@ -13,6 +13,7 @@ import {
 } from "../extension/shared/lexicon-view.js";
 import { eventFromWidget, initialViewMode, isAutoLearnHost, isSiteEnabled, pageHost, shouldAutoLearnPage } from "../extension/shared/site.js";
 import { explainRuntimeError, shouldQueueMessage } from "../extension/shared/messages.js";
+import { formatIpa, formatPronunciation } from "../extension/shared/pronounce.js";
 import { mergePrompts, promptOverrides, DEFAULT_PROMPTS, validatePrompts } from "../extension/shared/prompts.js";
 import { fallbackIfSkipped, pickFrameResult } from "../extension/shared/tab-bridge.js";
 import { DEFAULT_GLOSS_STYLE, glossStyleToCss, normalizeGlossStyle } from "../extension/shared/gloss-style.js";
@@ -505,6 +506,26 @@ test("draft and lexicon reads are not queued behind model calls", () => {
   assert.equal(shouldQueueMessage("GET_LEXICON"), false);
   assert.equal(shouldQueueMessage("GET_STATE"), false);
   assert.equal(shouldQueueMessage("GLOSS"), true);
+  assert.equal(shouldQueueMessage("PRONOUNCE"), true);
+});
+
+test("pronunciation labels wrap IPA and keep US/UK when they differ", () => {
+  assert.equal(formatIpa("ˈwɛðər"), "/ˈwɛðər/");
+  assert.equal(formatIpa("/ˈwɛðər/"), "/ˈwɛðər/");
+  assert.equal(
+    formatPronunciation({ text: "weather", ipa: "/ˈwɛðər/", hint: "韦-德尔" }),
+    "weather  /ˈwɛðər/  约「韦-德尔」",
+  );
+  assert.equal(
+    formatPronunciation({
+      text: "schedule",
+      ipa: "/ˈskɛdʒuːl/",
+      ipaUk: "/ˈʃɛdjuːl/",
+      hint: "斯凯-朱尔",
+      hintUk: "谢-朱尔",
+    }),
+    "schedule  美 /ˈskɛdʒuːl/  约「斯凯-朱尔」  英 /ˈʃɛdjuːl/  约「谢-朱尔」",
+  );
 });
 
 test("long blocks split by sentence then pack into bounded batches", () => {
@@ -540,6 +561,7 @@ test("custom prompts fall back to the packaged system text", () => {
   assert.equal(merged.gloss, "只解释这个单位");
   assert.equal(merged.seed, DEFAULT_PROMPTS.seed);
   assert.equal(merged.translate, DEFAULT_PROMPTS.translate);
+  assert.equal(merged.pronounce, DEFAULT_PROMPTS.pronounce);
   assert.deepEqual(promptOverrides({ gloss: DEFAULT_PROMPTS.gloss, seed: "custom seed" }), {
     seed: "custom seed",
   });
