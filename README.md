@@ -27,6 +27,9 @@ python3 -m http.server 8767 --directory demo
 - 难度只移动熟词门槛：更易中文更多，更难英文更多
 - 模型失败时回原文
 - 不处理导航、侧栏；只改正文
+- 右下角工具条不常驻：原文状态下不显示，只有进入学习视图（或正在处理）时才出现；`×` 可临时隐藏，下次从插件按钮激活时再出现
+- 判断正文时，工具类名不算侧栏/目录证据：Tailwind 这类带 `:`、`[]`、`@` 的 class（如 `toc-visible:md:grid-cols-10`）只是样式，不是页面 chrome。否则正文容器会被误判、正文被整段丢掉
+- 页面加载即自动注入：`manifest.content_scripts` 声明的必须是**经典脚本**。Chrome 不认 `"type": "module"`，会把带 `import` 的文件当经典脚本执行并抛 `SyntaxError`，整个内容脚本直接不运行。所以入口是 `content/bootstrap.js`，由它 `import()` 拉 `content/content.js`。往 `content_scripts.js` 加文件时保持经典脚本语法，`npm test` 会检查
 
 ## 开发
 
@@ -34,3 +37,24 @@ python3 -m http.server 8767 --directory demo
 python3 scripts/build-lexicon.py
 npm test
 ```
+
+真实 Chrome 的端到端验收（加载 `extension/`，打开演示页，点一次弹窗里的「学习视图」，断言页面进入学习视图、工具条按需出现/隐藏；模型调用在 service worker 里打桩，不需要 Key 和网络）：
+
+```bash
+python3 -m http.server 8767 --directory demo
+node scripts/diagnose-reading-view.mjs
+```
+
+也可以直接跑线上页面（默认无头）：
+
+```bash
+node scripts/diagnose-reading-view.mjs https://example.com/some-article
+HEADFUL=1 node scripts/diagnose-reading-view.mjs https://openai.com/index/some-post/   # 有反爬的站点
+```
+
+某个页面「不翻译」时，先看它到底选了哪块正文：
+
+```bash
+HEADFUL=1 node scripts/probe-page.mjs https://example.com/some-article
+```
+

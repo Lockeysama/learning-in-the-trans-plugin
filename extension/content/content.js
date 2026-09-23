@@ -53,6 +53,7 @@ let autoLearnWatching = false;
 let suppressAutoLearn = false;
 let viewEpoch = 0;
 let lastViewId = "";
+let barDismissed = false;
 
 function log(...args) {
   if (debugEnabled) console.info("[Littp]", ...args);
@@ -269,17 +270,17 @@ async function processPageNow({ force = false, wait = false } = {}) {
   if (!stillThisPage()) return { skipped: true };
   debugEnabled = Boolean(light?.debugEnabled);
   if (light?.error) {
-    setToolbar({ mode, status: "扩展未就绪" });
+    updateBar({ mode, status: "扩展未就绪" });
     return { error: light.error };
   }
   if (!light.apiKeyPresent || !light.onboardingDone) {
     mountUi();
-    setToolbar({ mode: "original", status: "请先完成初始设置" });
+    updateBar({ mode: "original", status: "请先完成初始设置" });
     return { error: "请先完成初始设置" };
   }
   if ((light.disabledHosts || []).includes(currentHost())) {
     mountUi();
-    setToolbar({ mode: "original", status: "当前站点已关闭" });
+    updateBar({ mode: "original", status: "当前站点已关闭" });
     showOriginal();
     return { error: "当前站点已关闭" };
   }
@@ -290,7 +291,13 @@ async function processPageNow({ force = false, wait = false } = {}) {
     (!targets.length && isMailHost(currentHost()) && frameLooksLikeReadingPane());
   if (shouldWait) {
     mountUi();
-    setToolbar({ mode, status: wait ? "正在进入学习视图…" : "正在等待邮件正文…" });
+    // The reader just asked for the reading view and the body is still settling, so
+    // this status is worth showing even though `processing` has not flipped yet.
+    updateBar({
+      mode,
+      status: wait ? "正在进入学习视图…" : "正在等待邮件正文…",
+      visible: !barDismissed,
+    });
     const waited = await waitForTargets(wait ? 6000 : 4000, { minText: wait ? 80 : 0 });
     if (!stillThisPage()) return { skipped: true };
     if (waited.length) targets = waited;
@@ -298,7 +305,7 @@ async function processPageNow({ force = false, wait = false } = {}) {
   if (!targets.length) {
     if (window !== window.top) return { skipped: true };
     mountUi();
-    setToolbar({
+    updateBar({
       mode: "original",
       status: isMailHost(currentHost()) ? "请点开邮件正文后再切换" : "没有找到可阅读正文",
     });
@@ -315,7 +322,7 @@ async function processPageNow({ force = false, wait = false } = {}) {
     if (stillValid) {
       for (const target of targets) refreshGlossPresentation(target, lexiconKey);
       mountUi();
-      setToolbar({ mode, status: "学习视图" });
+      updateBar({ mode, status: "学习视图" });
       return { ok: true, mode, cached: true };
     }
   }
@@ -327,7 +334,7 @@ async function processPageNow({ force = false, wait = false } = {}) {
     let state = light;
     if (force) {
       usedCache = false;
-      setToolbar({ mode, status: "处理中…" });
+      updateBar({ mode, status: "处理中…" });
       state = await getStateWithRetry();
       if (!stillThisPage()) return { skipped: true };
     }
@@ -337,7 +344,7 @@ async function processPageNow({ force = false, wait = false } = {}) {
         continue;
       }
       usedCache = false;
-      setToolbar({ mode, status: "处理中…" });
+      updateBar({ mode, status: "处理中…" });
       if (state === light) state = await getStateWithRetry();
       if (!stillThisPage()) return { skipped: true };
       await processTarget(target, state, { force: true, lexiconKey });
@@ -345,18 +352,21 @@ async function processPageNow({ force = false, wait = false } = {}) {
     if (!stillThisPage()) return { skipped: true };
     root = targets[0];
     mode = "learning";
-    setToolbar({ mode, status: "学习视图" });
+    updateBar({ mode, status: "学习视图" });
     return { ok: true, mode, cached: usedCache };
   } catch (error) {
     if (!stillThisPage()) return { skipped: true };
     showOriginal();
     mode = "original";
-    setToolbar({ mode, status: "处理失败，已回原文" });
+    updateBar({ mode, status: "处理失败，已回原文" });
     log("failed", error?.message || error);
     if (debugEnabled) console.warn("Littp failed", error);
     return { error: error.message || "failed" };
   } finally {
     processing = false;
+    // Re-evaluate visibility now that processing has stopped, so a failure does not
+    // leave the bar resident.
+    updateBar();
   }
 }
 
@@ -385,7 +395,7 @@ function showOriginal({ persist = false } = {}) {
   }
   mode = "original";
   if (persist) suppressAutoLearn = true;
-  setToolbar({ mode, status: "原文" });
+  updateBar({ mode, status: "原文" });
   return { ok: true, mode };
 }
 
@@ -412,8 +422,24 @@ function clearPageCache() {
   clearStoredPageCache(sessionStore(), href);
   mode = "original";
   mountUi();
-  setToolbar({ mode, status: "已清除本页缓存" });
+  updateBar({ mode, status: "已清除本页缓存" });
   return { ok: true, mode, cleared: true };
+}
+
+// The bar is an affordance for the reading view, not a resident widget: it stays
+// hidden while the page sits in the original view, and the × button hides it for the
+// rest of the current activation.
+function updateBar({ mode: nextMode = mode, status, visible } = {}) {
+  setToolbar({
+    mode: nextMode,
+    status,
+    visible: visible ?? (!barDismissed && (processing || nextMode === "learning")),
+  });
+}
+
+function hideBar() {
+  barDismissed = true;
+  updateBar();
 }
 
 function mountUi() {
@@ -423,6 +449,7 @@ function mountUi() {
       suppressAutoLearn = false;
       processPage({ force: false });
     },
+    onHide: hideBar,
   });
 }
 
@@ -435,13 +462,14 @@ function resetForNewPage() {
   viewEpoch += 1;
   suppressAutoLearn = false;
   autoLearnAttempts = 0;
+  barDismissed = false;
   for (const target of connectedTargets()) clearTargetCache(target);
   tracked = [];
   root = null;
   mode = "original";
   if (window === window.top) {
     mountUi();
-    setToolbar({ mode: "original", status: "原文" });
+    updateBar({ mode: "original", status: "原文" });
   }
   scheduleAutoLearn();
   return { ok: true, mode };
@@ -527,7 +555,7 @@ async function bootAutoLearn() {
   const hasReading = extractTargets(document, host).length > 0;
   if (window === window.top || hasReading) {
     mountUi();
-    setToolbar({ mode: "original", status: "原文" });
+    updateBar({ mode: "original", status: "原文" });
   }
   installPageChangeWatch();
   watchForAutoLearn();
@@ -548,6 +576,9 @@ async function bootAutoLearn() {
 async function handleMessage(message) {
   if (message?.type === "PING") return { ok: true, mode };
   if (message?.type === "PROCESS_PAGE") {
+    // An explicit activation (popup button or context menu) brings the bar back even
+    // if the reader hid it earlier; auto-learn does not, so it stays out of the way.
+    barDismissed = false;
     return processPage({
       force: Boolean(message.force),
       wait: Boolean(message.wait),

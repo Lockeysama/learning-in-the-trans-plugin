@@ -17,7 +17,7 @@ const PREFERRED_SELECTORS = [
   "[itemprop='articleBody']",
 ];
 const UNSAFE_IDS = new Set(["app", "root", "__next", "__nuxt", "__layout"]);
-const CHROME_TOKENS = [
+const CHROME_TOKENS = new Set([
   "sidebar",
   "side-bar",
   "sidenav",
@@ -28,8 +28,29 @@ const CHROME_TOKENS = [
   "docs-nav",
   "table-of-contents",
   "doc-outline",
+]);
+// Prefix/suffix matching is restricted to names long enough to be unambiguous. "toc"
+// is deliberately absent: it is short enough that a utility class such as
+// `toc-visible:md:grid-cols-10` (a Tailwind variant) or `toc-collision-target` would
+// be misread as page chrome and the whole article body would be discarded.
+const CHROME_AFFIXES = [
+  "sidebar",
+  "side-bar",
+  "sidenav",
+  "side-nav",
+  "catalog",
+  "docnav",
+  "docs-nav",
+  "table-of-contents",
+  "doc-outline",
 ];
 const CHROME_SEGMENTS = new Set(["sidebar", "sidenav", "catalog", "docnav"]);
+// Utility-framework class names carry variants and arbitrary values (`md:`, `@container`,
+// `w-[calc(...)]`). They describe styling, not page chrome.
+const UTILITY_CLASS = /[:[\]()@/!#%,.\\]/;
+// A child holding less than this share of its parent's text is a hero, byline or
+// toolbar wrapper next to the body rather than a narrower container around it.
+const MIN_CHILD_TEXT_RATIO = 1 / 3;
 
 export const EMAIL_BODY_SELECTORS = [
   ".a3s.aiL",
@@ -101,11 +122,9 @@ export function isLikelyChrome(el) {
     .split(/\s+/)
     .filter(Boolean);
   return names.some((name) => {
-    if (
-      CHROME_TOKENS.some(
-        (key) => name === key || name.startsWith(`${key}-`) || name.endsWith(`-${key}`),
-      )
-    ) {
+    if (UTILITY_CLASS.test(name)) return false;
+    if (CHROME_TOKENS.has(name)) return true;
+    if (CHROME_AFFIXES.some((key) => name.startsWith(`${key}-`) || name.endsWith(`-${key}`))) {
       return true;
     }
     return name.split(/[_-]+/).some((part) => CHROME_SEGMENTS.has(part));
@@ -155,6 +174,15 @@ function contentChildren(current) {
   });
 }
 
+// Descending into a child that keeps only a sliver of the parent loses the article:
+// on a grid layout the biggest *eligible* child can be a hero or byline wrapper while
+// the body sits in a sibling that the chrome filter dropped.
+function keepsMostText(parent, child) {
+  const parentLen = textOf(parent).length;
+  if (!parentLen) return true;
+  return textOf(child).length >= parentLen * MIN_CHILD_TEXT_RATIO;
+}
+
 function bestContentChild(current, { allowSingle = false } = {}) {
   const kids = contentChildren(current);
   if (!kids.length) return null;
@@ -167,8 +195,8 @@ function bestContentChild(current, { allowSingle = false } = {}) {
       bestScore = score;
     }
   }
-  if (best && bestScore >= 80) return best;
-  if (allowSingle && kids.length === 1) return kids[0];
+  if (best && bestScore >= 80) return keepsMostText(current, best) ? best : null;
+  if (allowSingle && kids.length === 1 && keepsMostText(current, kids[0])) return kids[0];
   return null;
 }
 

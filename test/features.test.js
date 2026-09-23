@@ -310,6 +310,53 @@ test("article nested in a form is still the reading root", () => {
   assert.equal(extractRoot(docOf(body)), article);
 });
 
+test("utility-framework classes are not mistaken for page chrome", () => {
+  // A Tailwind variant that merely starts with "toc-", as on openai.com article pages.
+  assert.equal(isLikelyChrome(el("div", { className: "toc-visible:md:grid-cols-10" })), false);
+  assert.equal(isLikelyChrome(el("div", { className: "toc-collision-target no-scrollbar" })), false);
+  assert.equal(isLikelyChrome(el("div", { className: "@container w-full" })), false);
+  assert.equal(isLikelyChrome(el("div", { className: "max-w-container" })), false);
+  // Real chrome names still count.
+  assert.equal(isLikelyChrome(el("div", { className: "toc" })), true);
+  assert.equal(isLikelyChrome(el("div", { className: "table-of-contents" })), true);
+  assert.equal(isLikelyChrome(el("div", { className: "docs-nav-list" })), true);
+  assert.equal(isLikelyChrome(el("div", { className: "theme-doc-sidebar-container" })), true);
+});
+
+test("an article body behind a toc- utility class is still the reading root", () => {
+  const paragraph = () =>
+    el("p", { text: "The rain had eased, so I decided to go out regardless of the weather. " });
+  const content = el(
+    "div",
+    { className: "max-w-container @container w-full toc-visible:md:grid-cols-10 grid" },
+    [paragraph(), paragraph(), paragraph(), paragraph()],
+  );
+  const hero = el("div", { className: "@lg:max-w-container flex w-auto" }, [paragraph()]);
+  const toc = el("nav", { attrs: { "aria-label": "Table of contents" } }, [
+    el("a", { text: "Introduction" }),
+  ]);
+  const article = el("article", { className: "flex min-w-0 flex-col gap-12" }, [hero, content, toc]);
+  const body = el("body", {}, [article]);
+  assert.equal(extractRoot(docOf(body)), content);
+});
+
+test("the peel refuses to trade an article for its byline wrapper", () => {
+  const paragraph = () =>
+    el("p", { text: "The rain had eased, so I decided to go out regardless of the weather. " });
+  const hero = el("div", { className: "hero" }, [paragraph()]);
+  // The body is only reachable through a class the chrome filter drops, so the one
+  // eligible child is the tiny hero. Descending there would lose the article.
+  const body = el("div", { className: "content-sidebar-teaser" }, [
+    paragraph(),
+    paragraph(),
+    paragraph(),
+    paragraph(),
+  ]);
+  const article = el("article", {}, [hero, body]);
+  const root = extractRoot(docOf(el("body", {}, [article])));
+  assert.equal(root, article);
+});
+
 test("spa pages without article tags still have a reading root", () => {
   const text = "The rain had eased, so I decided to go out regardless of the weather. ";
   const markdown = el("div", { className: "markdown-view", text: text.repeat(4) });
