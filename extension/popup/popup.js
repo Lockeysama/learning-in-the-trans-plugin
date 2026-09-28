@@ -10,6 +10,8 @@ const siteEnabled = document.getElementById("siteEnabled");
 const autoLearn = document.getElementById("autoLearn");
 const originalBtn = document.getElementById("original");
 const learnBtn = document.getElementById("learn");
+const translateBtn = document.getElementById("translate");
+let viewRequest = 0;
 
 let refreshToken = 0;
 let autoLearnBusy = false;
@@ -47,9 +49,9 @@ async function sendToTab(tabId, url, payload) {
 }
 
 function setViewSwitch(mode) {
-  const learning = mode === "learning";
-  originalBtn.setAttribute("aria-pressed", String(!learning));
-  learnBtn.setAttribute("aria-pressed", String(learning));
+  originalBtn.setAttribute("aria-pressed", String(mode === "original"));
+  learnBtn.setAttribute("aria-pressed", String(mode === "learning"));
+  translateBtn.setAttribute("aria-pressed", String(mode === "translated"));
 }
 
 function applyAutoLearn(host, state) {
@@ -94,7 +96,7 @@ async function refresh() {
       onboardingDone: state.onboardingDone,
     }),
   );
-  if (tab?.id && ready && enabled) {
+  if (tab?.id && state.apiKeyPresent && enabled) {
     const status = await sendToTab(tab.id, tab.url, { type: "CONTENT_STATUS" });
     if (token !== refreshToken) return;
     if (status?.mode) setViewSwitch(status.mode);
@@ -158,24 +160,29 @@ for (const input of document.querySelectorAll("input[name='difficulty']")) {
   };
 }
 
-learnBtn.onclick = async () => {
+async function chooseView(mode, type) {
+  const request = ++viewRequest;
+  ++refreshToken;
   message.textContent = "";
   if (!window.__tabId) return;
-  setViewSwitch("learning");
-  const result = await sendToTab(window.__tabId, window.__tabUrl, { type: "PROCESS_PAGE" });
+  setViewSwitch(mode);
+  const result = await sendToTab(window.__tabId, window.__tabUrl, { type });
+  if (request !== viewRequest) return;
   message.textContent = result?.error || "";
-  if (result?.error) setViewSwitch("original");
-};
+  if (result?.mode) setViewSwitch(result.mode);
+  else if (result?.error || result?.skipped) {
+    const status = await sendToTab(window.__tabId, window.__tabUrl, { type: "CONTENT_STATUS" });
+    if (request === viewRequest) setViewSwitch(status?.mode || "original");
+  }
+}
 
-originalBtn.onclick = async () => {
-  message.textContent = "";
-  if (!window.__tabId) return;
-  setViewSwitch("original");
-  const result = await sendToTab(window.__tabId, window.__tabUrl, { type: "RESTORE_PAGE" });
-  message.textContent = result?.error || "";
-};
+learnBtn.onclick = () => chooseView("learning", "PROCESS_PAGE");
+translateBtn.onclick = () => chooseView("translated", "TRANSLATE_PAGE");
+originalBtn.onclick = () => chooseView("original", "RESTORE_PAGE");
 
 document.getElementById("clearCache").onclick = async () => {
+  ++viewRequest;
+  ++refreshToken;
   message.textContent = "";
   if (!window.__tabId) return;
   const result = await sendToTab(window.__tabId, window.__tabUrl, { type: "CLEAR_PAGE_CACHE" });

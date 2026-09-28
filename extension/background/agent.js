@@ -17,6 +17,14 @@ import { normalizeGlossStyle } from "../shared/gloss-style.js";
 import { formatIpa, formatPronunciation } from "../shared/pronounce.js";
 import { emptyUsage, readUsage } from "../shared/usage.js";
 import { translationInput, translationResult } from "../shared/selection-translation.js";
+import { validateFullTranslation } from "../shared/full-translation.js";
+import { createTranslationCache } from "./translation-cache.js";
+
+const translationCache = createTranslationCache(chrome.storage.local);
+
+function callPageModel(ticket, action, args, cacheable) {
+  return translationCache.getOrCreate(ticket, [MODEL, action, args.system, args.user], () => callModel(action, args), cacheable);
+}
 
 function ensureContextMenu() {
   chrome.contextMenus.removeAll(() => {
@@ -232,16 +240,17 @@ async function getLexicon() {
   };
 }
 
-async function glossItems(items) {
+async function glossItems(items, ticket) {
   const apiKey = await getApiKey();
   if (!apiKey || !items?.length) return {};
   const prompts = await loadPrompts();
-  const payload = await callModel("gloss", {
+  const payload = await callPageModel(ticket, "gloss", {
     apiKey,
     system: prompts.gloss,
     user: JSON.stringify({ items }),
     maxTokens: Math.min(4000, 180 + items.length * 40),
-  });
+  }, payload => Array.isArray(payload?.items) && items.every(input => payload.items.some(item =>
+    String(item?.span || "").trim().toLowerCase() === input.span.toLowerCase() && typeof item.gloss === "string" && /[\u4e00-\u9fff]/.test(item.gloss))));
   const map = {};
   for (const item of payload.items || []) {
     const span = String(item.span || "").trim();
@@ -254,20 +263,38 @@ async function glossItems(items) {
   return map;
 }
 
-async function translateParagraphs(paragraphs) {
+async function translateParagraphs(paragraphs, ticket) {
   const apiKey = await getApiKey();
   if (!apiKey) throw new Error("missing_api_key");
   const prompts = await loadPrompts();
-  const payload = await callModel("translate", {
+  const payload = await callPageModel(ticket, "translate", {
     apiKey,
     system: prompts.translate,
     user: JSON.stringify({ paragraphs }),
     maxTokens: Math.min(4000, 200 + paragraphs.join("").length),
-  });
+  }, payload => Array.isArray(payload?.paragraphs) && payload.paragraphs.length === paragraphs.length && payload.paragraphs.every(text => typeof text === "string" && text.trim()));
   const translated = payload.paragraphs || [];
   return paragraphs.map((original, index) =>
     String(translated[index] || "").trim() || original,
   );
+}
+
+async function translateFullText({ items, targetLanguage }, ticket) {
+  if (!["zh", "en"].includes(targetLanguage) || !Array.isArray(items) || !items.length || items.length > 8 || items.some(item => typeof item?.id !== "string" || typeof item?.text !== "string" || !item.text.trim() || item.text.length > 720)) {
+    throw new Error("全文翻译参数不正确");
+  }
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error("请先在设置中填写 API Key");
+  const prompts = await loadPrompts();
+  const payload = await callPageModel(ticket, "fullTranslate", {
+    apiKey, system: prompts.fullTranslate,
+    user: JSON.stringify({ targetLanguage, items: items.map(({ id, text, context }) => ({ id, text, context: String(context || "").slice(0, 1400) })) }),
+    maxTokens: Math.min(6000, 300 + items.reduce((sum, item) => sum + item.text.length * 3, 0)),
+  }, payload => {
+    try { validateFullTranslation(payload, items); return true; }
+    catch { return false; }
+  });
+  return validateFullTranslation(payload, items);
 }
 
 async function pronounceItem(text, sentence = "") {
@@ -450,6 +477,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const pageUrl = sender.url || sender.tab?.url || "";
+  const ticket = translationCache.ticket(pageUrl);
   const run = async () => {
     switch (message?.type) {
       case "GET_STATE":
@@ -471,10 +500,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return generateSeed(message);
       case "GLOSS":
         await recordBehavior("gloss_request", { count: message.items?.length || 0, url: sender.tab?.url });
-        return glossItems(message.items || []);
+        return glossItems(message.items || [], ticket);
       case "TRANSLATE_PARAS":
         await recordBehavior("translate_request", { count: message.paragraphs?.length || 0 });
-        return translateParagraphs(message.paragraphs || []);
+        return translateParagraphs(message.paragraphs || [], ticket);
+      case "TRANSLATE_FULL_TEXT":
+        return translateFullText(message, ticket);
+      case "CLEAR_TRANSLATION_CACHE":
+        await translationCache.clear(pageUrl);
+        return { ok: true };
       case "SET_DEBUG":
         await chrome.storage.local.set({ [STORAGE_KEYS.debugEnabled]: Boolean(message.enabled) });
         await recordBehavior("debug", message.enabled ? "on" : "off");

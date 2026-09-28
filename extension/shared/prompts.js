@@ -1,6 +1,7 @@
 import {
   GLOSS_SYSTEM,
   PARAGRAPH_SYSTEM,
+  FULL_TRANSLATION_SYSTEM,
   PRONOUNCE_SYSTEM,
   SEED_SYSTEM,
   SELECTION_TRANSLATE_SYSTEM,
@@ -12,6 +13,7 @@ export const DEFAULT_PROMPTS = {
   gloss: GLOSS_SYSTEM,
   seed: SEED_SYSTEM,
   translate: PARAGRAPH_SYSTEM,
+  fullTranslate: FULL_TRANSLATION_SYSTEM,
   pronounce: PRONOUNCE_SYSTEM,
   selectionTranslate: SELECTION_TRANSLATE_SYSTEM,
   selectionLiteral: SELECTION_LITERAL_SYSTEM,
@@ -22,6 +24,7 @@ export const PROMPT_JSON_EXAMPLES = {
   gloss: '{"items":[{"span":"...","gloss":"..."}]}',
   seed: '{"coverageBands":["junior","senior"],"extraLemmas":["nonetheless"]}',
   translate: '{"paragraphs":["English paragraph", "..."]}',
+  fullTranslate: '{"items":[{"id":"0","translation":"译文"}]}',
   pronounce: '{"text":"...","ipa":"/ˈwɛðər/","ipaUk":"","hint":"韦-德尔","hintUk":""}',
   selectionTranslate: '{"kind":"sentence","translation":"...","partOfSpeech":"","note":""}',
   selectionLiteral: '{"translation":"...","note":""}',
@@ -30,6 +33,7 @@ export const PROMPT_JSON_EXAMPLES = {
 
 export const PROMPT_META = [
   ...[
+    ["fullTranslate", "全文翻译", "按指定目标语言翻译正文片段，结合段落上下文并保留片段编号。"],
     ["selectionTranslate", "即时翻译", "划词后优先显示自然译文，按单词、短语或句子调整内容。"],
     ["selectionLiteral", "贴近原文", "按需提供贴近原文结构的译文，无差异时不强行改写。"],
     ["selectionAnalysis", "词句解析", "按需提供词组/意群对照与关键句式解析。"],
@@ -59,6 +63,7 @@ export const PROMPT_META = [
 ];
 
 const JSON_CHECKS = {
+  fullTranslate: (obj) => Array.isArray(obj?.items) && obj.items.some(item => typeof item?.id === "string" && typeof item?.translation === "string"),
   selectionTranslate: (obj) => ["word", "phrase", "sentence"].includes(obj?.kind) && typeof obj?.translation === "string",
   selectionLiteral: (obj) => typeof obj?.translation === "string" && typeof obj?.note === "string",
   selectionAnalysis: (obj) => Array.isArray(obj?.units) && obj.units.some((unit) => typeof unit?.source === "string" && typeof unit?.meaning === "string") && typeof obj?.structure === "string" && typeof obj?.usage === "string",

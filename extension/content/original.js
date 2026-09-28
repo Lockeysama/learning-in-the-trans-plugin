@@ -3,6 +3,8 @@ import { hasChromeDescendant, isLikelyChrome, isUnsafeRoot } from "./extract.js"
 const ORIGINAL = "_littpOriginal";
 const LEARNING = "_littpLearning";
 const CACHE_META = "_littpCacheMeta";
+const TRANSLATION = "_littpTranslation";
+const TRANSLATION_META = "_littpTranslationMeta";
 export const SESSION_PREFIX = "littp-cache:";
 
 export function hashText(text) {
@@ -81,6 +83,7 @@ export function sourceHtml(root, viewingLearning = false) {
   if (root[LEARNING] != null && root.innerHTML === root[LEARNING] && root[ORIGINAL] != null) {
     return root[ORIGINAL];
   }
+  if (root[TRANSLATION] != null && root.innerHTML === root[TRANSLATION] && root[ORIGINAL] != null) return root[ORIGINAL];
   return root.innerHTML;
 }
 
@@ -101,19 +104,38 @@ export function rememberCache(root, lexiconKey) {
 export function refreshSource(root, viewingLearning = false) {
   if (viewingLearning) return;
   if (root[LEARNING] != null && root.innerHTML === root[LEARNING]) return;
+  if (root[TRANSLATION] != null && root.innerHTML === root[TRANSLATION]) return;
   if (root[ORIGINAL] != null && root.innerHTML === root[ORIGINAL]) return;
   root[ORIGINAL] = root.innerHTML;
   delete root[LEARNING];
   delete root[CACHE_META];
+  delete root[TRANSLATION];
+  delete root[TRANSLATION_META];
+}
+
+export function showTranslation(root, targetLanguage) {
+  const meta = root[TRANSLATION_META];
+  if (!meta || meta.targetLanguage !== targetLanguage || meta.sourceHash !== hashText(sourceHtml(root))) return false;
+  assignHtml(root, root[TRANSLATION]);
+  return true;
+}
+
+export function saveTranslation(root, work, targetLanguage) {
+  copyProcessedHtml(root, work);
+  root[TRANSLATION] = root.innerHTML;
+  root[TRANSLATION_META] = { targetLanguage, sourceHash: hashText(root[ORIGINAL]) };
+  discardWork(work);
 }
 
 export function clearTargetCache(root) {
-  if (root[LEARNING] != null && root.innerHTML === root[LEARNING] && root[ORIGINAL] != null) {
+  if ((root.innerHTML === root[LEARNING] || root.innerHTML === root[TRANSLATION]) && root[ORIGINAL] != null) {
     assignHtml(root, root[ORIGINAL]);
   }
   delete root[ORIGINAL];
   delete root[LEARNING];
   delete root[CACHE_META];
+  delete root[TRANSLATION];
+  delete root[TRANSLATION_META];
 }
 
 export function readStoredPageCache(store, href) {

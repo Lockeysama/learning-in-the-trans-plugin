@@ -18,6 +18,8 @@ import {
   restore,
   saveLearning,
   showLearning,
+  showTranslation,
+  saveTranslation,
   sourceHtml,
   workingCopy,
   pageViewId,
@@ -36,6 +38,7 @@ import { explainRuntimeError, isStaleExtensionError, sendRuntime } from "../shar
 import { shouldAutoLearnPage } from "../shared/site.js";
 import { mountSelector } from "./select.js";
 import { mountToolbar, setToolbar } from "./toolbar.js";
+import { translateFullText } from "./full-translation.js";
 
 const alreadyLoaded = Boolean(globalThis.__littpLoaded);
 globalThis.__littpLoaded = true;
@@ -45,6 +48,8 @@ let tracked = [];
 let mode = "original";
 let processing = false;
 let processWait = null;
+let pendingView = null;
+let barError = false;
 let debugEnabled = false;
 let reprocessTimer = 0;
 let autoLearnTimer = 0;
@@ -198,8 +203,8 @@ function pageHref() {
 }
 
 function hydrateTarget(target, lexiconKey) {
-  if (cacheFits(target, { lexiconKey, viewingLearning: mode === "learning" })) return true;
-  const live = sourceHtml(target, mode === "learning");
+  if (cacheFits(target, { lexiconKey, viewingLearning: mode !== "original" })) return true;
+  const live = sourceHtml(target, mode !== "original");
   return hydratePageCache(target, readStoredPageCache(sessionStore(), pageHref()), lexiconKey, live);
 }
 
@@ -221,12 +226,14 @@ function applyLearningView(target, lexiconKey) {
   return true;
 }
 
-async function processTarget(target, state, { force = false, lexiconKey }) {
+async function processTarget(target, state, { force = false, lexiconKey, view = "learning", targetLanguage, checkCurrent }) {
+  checkCurrent?.();
   track(target);
-  refreshSource(target, mode === "learning");
+  refreshSource(target, mode !== "original");
   if (!force) {
+    if (view === "translated") return { cached: showTranslation(target, targetLanguage) };
     hydrateTarget(target, lexiconKey);
-    if (cacheFits(target, { lexiconKey, viewingLearning: mode === "learning" }) && applyLearningView(target, lexiconKey)) {
+    if (cacheFits(target, { lexiconKey, viewingLearning: mode !== "original" }) && applyLearningView(target, lexiconKey)) {
       return { cached: true };
     }
     return { cached: false };
@@ -234,9 +241,22 @@ async function processTarget(target, state, { force = false, lexiconKey }) {
   const work = workingCopy(target);
   if (!work) return { cached: false, skipped: true };
   try {
+    if (view === "translated") {
+      await translateFullText(work, targetLanguage, sendRuntime, {
+        checkCurrent,
+        onBatch: (done, total) => {
+          checkCurrent?.();
+          copyProcessedHtml(target, work);
+          updateBar({ status: `全文翻译中 ${done}/${total}…` });
+        },
+      });
+      checkCurrent?.();
+      saveTranslation(target, work, targetLanguage);
+      return { cached: false };
+    }
     const lang = detectLang(work.textContent || work.innerText || "");
     log("process", { lang, host: currentHost(), known: state.knownLemmas?.length });
-    const flush = () => copyProcessedHtml(target, work);
+    const flush = () => { checkCurrent?.(); copyProcessedHtml(target, work); };
     if (lang === "zh") await translateChinese(work, { onBatch: flush });
     await annotateEnglish(
       work,
@@ -249,6 +269,7 @@ async function processTarget(target, state, { force = false, lexiconKey }) {
     persistPageCache(sessionStore(), pageHref(), target, lexiconKey);
   } catch (error) {
     discardWork(work);
+    checkCurrent?.();
     if (hasOriginal(target)) restore(target);
     throw error;
   }
@@ -263,9 +284,9 @@ function scheduleReprocess() {
   }, 400);
 }
 
-async function processPageNow({ force = false, wait = false } = {}) {
-  const epoch = viewEpoch;
+async function processPageNow({ force = false, wait = false, view = "learning", epoch } = {}) {
   const stillThisPage = () => epoch === viewEpoch;
+  const checkCurrent = () => { if (!stillThisPage()) throw new Error("view_changed"); };
   const light = await getStateWithRetry({ includeLemmas: false, includeCounts: false });
   if (!stillThisPage()) return { skipped: true };
   debugEnabled = Boolean(light?.debugEnabled);
@@ -273,7 +294,7 @@ async function processPageNow({ force = false, wait = false } = {}) {
     updateBar({ mode, status: "扩展未就绪" });
     return { error: light.error };
   }
-  if (!light.apiKeyPresent || !light.onboardingDone) {
+  if (!light.apiKeyPresent || (view === "learning" && !light.onboardingDone)) {
     mountUi();
     updateBar({ mode: "original", status: "请先完成初始设置" });
     return { error: "请先完成初始设置" };
@@ -295,7 +316,7 @@ async function processPageNow({ force = false, wait = false } = {}) {
     // this status is worth showing even though `processing` has not flipped yet.
     updateBar({
       mode,
-      status: wait ? "正在进入学习视图…" : "正在等待邮件正文…",
+      status: wait ? (view === "translated" ? "正在进入全文翻译…" : "正在进入学习视图…") : "正在等待邮件正文…",
       visible: !barDismissed,
     });
     const waited = await waitForTargets(wait ? 6000 : 4000, { minText: wait ? 80 : 0 });
@@ -313,7 +334,13 @@ async function processPageNow({ force = false, wait = false } = {}) {
   }
 
   const lexiconKey = lexiconFingerprint(light);
-  if (!force && mode === "learning") {
+  const targetLanguage = view === "translated"
+    ? (detectLang(targets.map(target => {
+      const work = document.createElement("div");
+      work.innerHTML = sourceHtml(target, mode !== "original");
+      return work.textContent;
+    }).join("\n")) === "zh" ? "en" : "zh") : null;
+  if (view === "learning" && !force && mode === "learning") {
     const stillValid = targets.every((target) => {
       track(target);
       return hydrateTarget(target, lexiconKey)
@@ -335,54 +362,74 @@ async function processPageNow({ force = false, wait = false } = {}) {
     if (force) {
       usedCache = false;
       updateBar({ mode, status: "处理中…" });
-      state = await getStateWithRetry();
+      if (view === "learning") state = await getStateWithRetry();
       if (!stillThisPage()) return { skipped: true };
     }
     for (const target of targets) {
       if (!stillThisPage()) return { skipped: true };
-      if (!force && (await processTarget(target, state, { force: false, lexiconKey })).cached) {
+      if (!force && (await processTarget(target, state, { force: false, lexiconKey, view, targetLanguage, checkCurrent })).cached) {
         continue;
       }
       usedCache = false;
       updateBar({ mode, status: "处理中…" });
-      if (state === light) state = await getStateWithRetry();
+      if (view === "learning" && state === light) state = await getStateWithRetry();
       if (!stillThisPage()) return { skipped: true };
-      await processTarget(target, state, { force: true, lexiconKey });
+      await processTarget(target, state, { force: true, lexiconKey, view, targetLanguage, checkCurrent });
     }
     if (!stillThisPage()) return { skipped: true };
     root = targets[0];
-    mode = "learning";
-    updateBar({ mode, status: "学习视图" });
+    mode = view;
+    updateBar({ mode, status: view === "translated" ? (targetLanguage === "zh" ? "全文 · 中文" : "全文 · 英文") : "学习视图" });
     return { ok: true, mode, cached: usedCache };
   } catch (error) {
     if (!stillThisPage()) return { skipped: true };
     showOriginal();
     mode = "original";
+    barError = true;
     updateBar({ mode, status: "处理失败，已回原文" });
     log("failed", error?.message || error);
     if (debugEnabled) console.warn("Littp failed", error);
     return { error: error.message || "failed" };
-  } finally {
-    processing = false;
-    // Re-evaluate visibility now that processing has stopped, so a failure does not
-    // leave the bar resident.
-    updateBar();
   }
 }
 
-async function processPage(opts = {}) {
-  while (processWait) {
-    const result = await processWait;
-    if (mode === "learning" && !opts.force) return result;
-    if (mode === "learning") return result;
-  }
-  processWait = processPageNow(opts).finally(() => {
+function processPage(opts = {}) {
+  const view = opts.view || "learning";
+  if (processWait && pendingView === view) return processWait;
+  if (processWait) showOriginal();
+  const epoch = ++viewEpoch;
+  pendingView = view;
+  barError = false;
+  clearTimeout(reprocessTimer);
+  suppressAutoLearn = true;
+  const pending = processPageNow({ ...opts, view, epoch }).catch(error => {
+    if (epoch !== viewEpoch) return { skipped: true };
+    showOriginal();
+    barError = true;
+    updateBar({ status: explainRuntimeError(error) });
+    return { error: explainRuntimeError(error), mode };
+  }).finally(() => {
+    if (processWait !== pending) return;
     processWait = null;
+    pendingView = null;
+    processing = false;
+    updateBar();
   });
-  return processWait;
+  processWait = pending;
+  return pending;
+}
+
+function cancelProcessing() {
+  viewEpoch += 1;
+  processWait = null;
+  pendingView = null;
+  processing = false;
+  barError = false;
+  clearTimeout(reprocessTimer);
 }
 
 function showOriginal({ persist = false } = {}) {
+  cancelProcessing();
   for (const target of connectedTargets()) {
     if (hasOriginal(target)) restore(target);
   }
@@ -400,10 +447,6 @@ function showOriginal({ persist = false } = {}) {
 }
 
 async function toggleLearning() {
-  if (processWait) {
-    const result = await processWait;
-    if (mode === "learning") return result;
-  }
   if (mode === "learning") {
     mountUi();
     return showOriginal({ persist: true });
@@ -412,7 +455,9 @@ async function toggleLearning() {
   return processPage({ force: false, wait: true });
 }
 
-function clearPageCache() {
+async function clearPageCache() {
+  showOriginal({ persist: true });
+  const epoch = viewEpoch;
   const href = pageHref();
   for (const target of connectedTargets()) {
     clearTargetCache(target);
@@ -422,6 +467,13 @@ function clearPageCache() {
   clearStoredPageCache(sessionStore(), href);
   mode = "original";
   mountUi();
+  const result = await sendRuntime({ type: "CLEAR_TRANSLATION_CACHE" });
+  if (epoch !== viewEpoch) return { skipped: true };
+  if (result?.error) {
+    barError = true;
+    updateBar({ mode, status: result.error });
+    return result;
+  }
   updateBar({ mode, status: "已清除本页缓存" });
   return { ok: true, mode, cleared: true };
 }
@@ -433,7 +485,7 @@ function updateBar({ mode: nextMode = mode, status, visible } = {}) {
   setToolbar({
     mode: nextMode,
     status,
-    visible: visible ?? (!barDismissed && (processing || nextMode === "learning")),
+    visible: visible ?? (!barDismissed && (processing || barError || nextMode !== "original")),
   });
 }
 
@@ -449,6 +501,7 @@ function mountUi() {
       suppressAutoLearn = false;
       processPage({ force: false });
     },
+    onTranslate: () => processPage({ view: "translated" }),
     onHide: hideBar,
   });
 }
@@ -459,7 +512,7 @@ function currentViewId() {
 
 function resetForNewPage() {
   lastViewId = currentViewId();
-  viewEpoch += 1;
+  cancelProcessing();
   suppressAutoLearn = false;
   autoLearnAttempts = 0;
   barDismissed = false;
@@ -505,7 +558,7 @@ function installPageChangeWatch() {
 }
 
 function scheduleAutoLearn() {
-  if (suppressAutoLearn || mode === "learning") return;
+  if (suppressAutoLearn || mode !== "original") return;
   clearTimeout(autoLearnTimer);
   autoLearnTimer = setTimeout(() => {
     autoLearnIfNeeded().catch((error) => log("auto learn failed", error?.message || error));
@@ -517,16 +570,16 @@ function watchForAutoLearn() {
   autoLearnWatching = true;
   const observer = new MutationObserver(() => {
     if (syncPageView()) return;
-    if (suppressAutoLearn || mode === "learning" || processing || processWait) return;
+    if (suppressAutoLearn || mode !== "original" || processing || processWait) return;
     scheduleAutoLearn();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 async function autoLearnIfNeeded() {
-  if (suppressAutoLearn || mode === "learning") return;
+  if (suppressAutoLearn || mode !== "original") return;
   if (processWait) await processWait;
-  if (suppressAutoLearn || mode === "learning" || processing) return;
+  if (suppressAutoLearn || mode !== "original" || processing) return;
   if (autoLearnAttempts >= 5) return;
   const state = await getStateWithRetry({ includeLemmas: false, includeCounts: false });
   debugEnabled = Boolean(state?.debugEnabled);
@@ -575,11 +628,12 @@ async function bootAutoLearn() {
 
 async function handleMessage(message) {
   if (message?.type === "PING") return { ok: true, mode };
-  if (message?.type === "PROCESS_PAGE") {
+  if (message?.type === "PROCESS_PAGE" || message?.type === "TRANSLATE_PAGE") {
     // An explicit activation (popup button or context menu) brings the bar back even
     // if the reader hid it earlier; auto-learn does not, so it stays out of the way.
     barDismissed = false;
     return processPage({
+      view: message.type === "TRANSLATE_PAGE" ? "translated" : "learning",
       force: Boolean(message.force),
       wait: Boolean(message.wait),
     });

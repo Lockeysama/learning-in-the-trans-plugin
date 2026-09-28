@@ -18,6 +18,8 @@ function ensureHost() {
       .bar {
         font: 13px/1.4 ui-sans-serif, system-ui, sans-serif;
         display: flex;
+        flex-wrap: wrap;
+        max-width: calc(100vw - 52px);
         gap: 6px;
         align-items: center;
         padding: 8px 10px;
@@ -49,6 +51,7 @@ function ensureHost() {
     <div class="bar">
       <button id="original" type="button">原文</button>
       <button id="learning" type="button">学习视图</button>
+      <button id="translated" type="button">全文翻译</button>
       <span class="status" id="status">Littp</span>
       <button id="hide" type="button" title="临时隐藏" aria-label="临时隐藏 Littp 工具条">×</button>
     </div>
@@ -56,11 +59,12 @@ function ensureHost() {
   return host;
 }
 
-export function mountToolbar({ onOriginal, onLearning, onHide }) {
+export function mountToolbar({ onOriginal, onLearning, onTranslate, onHide }) {
   const host = ensureHost();
   const root = host.shadowRoot;
   root.getElementById("original").onclick = onOriginal;
   root.getElementById("learning").onclick = onLearning;
+  root.getElementById("translated").onclick = onTranslate;
   root.getElementById("hide").onclick = onHide;
   return host;
 }
@@ -73,6 +77,7 @@ export function setToolbar({ mode, status, visible = true }) {
   const root = host.shadowRoot;
   root.getElementById("original").dataset.active = String(mode === "original");
   root.getElementById("learning").dataset.active = String(mode === "learning");
+  root.getElementById("translated").dataset.active = String(mode === "translated");
   if (status != null) root.getElementById("status").textContent = status;
   host.style.display = visible ? "" : "none";
 }
