@@ -3,6 +3,15 @@ import { addUsage, emptyUsage, readUsage } from "../shared/usage.js";
 
 const MAX_LOGS = 80;
 const MAX_FIELD = 12000;
+let writes = Promise.resolve();
+
+// Model requests can finish concurrently (page processing and instant lookups).
+// Serialize only the storage updates so token counts and logs are not lost.
+function record(work) {
+  const next = writes.then(work, work);
+  writes = next.catch(() => {});
+  return next;
+}
 
 function clip(value) {
   const text = String(value ?? "");
@@ -10,7 +19,11 @@ function clip(value) {
   return `${text.slice(0, MAX_FIELD)}\n…(truncated)`;
 }
 
-export async function recordCall({ action, request, rawContent, usage, error }) {
+export function recordCall(args) {
+  return record(() => writeCall(args));
+}
+
+async function writeCall({ action, request, rawContent, usage, error }) {
   const stored = await chrome.storage.local.get([
     STORAGE_KEYS.debugEnabled,
     STORAGE_KEYS.usage,
@@ -45,7 +58,11 @@ export async function recordCall({ action, request, rawContent, usage, error }) 
   return nextUsage;
 }
 
-export async function recordBehavior(action, detail) {
+export function recordBehavior(action, detail) {
+  return record(() => writeBehavior(action, detail));
+}
+
+async function writeBehavior(action, detail) {
   const stored = await chrome.storage.local.get([
     STORAGE_KEYS.debugEnabled,
     STORAGE_KEYS.debugLogs,

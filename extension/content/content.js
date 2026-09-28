@@ -596,6 +596,9 @@ globalThis.__littpDispatch ||= handleMessage;
 
 if (!alreadyLoaded) {
   mountSelector({
+    onTranslate: (text, sentence, mode, natural) => sendRuntime({
+      type: "TRANSLATE_SELECTION", text, sentence, mode, natural,
+    }),
     onAddDraft: async (text) => {
       const result = await sendRuntime({ type: "ADD_DRAFT", text });
       log("add draft", text, result);
@@ -628,14 +631,12 @@ if (!alreadyLoaded) {
     if (changes.debugEnabled) debugEnabled = Boolean(changes.debugEnabled.newValue);
     if (changes.glossStyle) applyGlossStyle(changes.glossStyle.newValue);
     if (changes.autoLearnHosts) scheduleAutoLearn();
+    // Vocabulary edits are saved immediately but applied on the next manual
+    // refresh/processing pass, so marking a word does not interrupt reading.
     if (
       changes.difficulty ||
       changes.disabledHosts ||
-      changes.coverageBands ||
-      changes.extraLemmas ||
-      changes.extraUnknowns ||
-      changes.removedLemmas ||
-      changes.unknownDrafts
+      changes.coverageBands
     ) {
       scheduleReprocess();
     }

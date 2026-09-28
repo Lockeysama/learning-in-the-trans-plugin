@@ -3,6 +3,9 @@ import {
   PARAGRAPH_SYSTEM,
   PRONOUNCE_SYSTEM,
   SEED_SYSTEM,
+  SELECTION_TRANSLATE_SYSTEM,
+  SELECTION_LITERAL_SYSTEM,
+  SELECTION_ANALYSIS_SYSTEM,
 } from "./constants.js";
 
 export const DEFAULT_PROMPTS = {
@@ -10,6 +13,9 @@ export const DEFAULT_PROMPTS = {
   seed: SEED_SYSTEM,
   translate: PARAGRAPH_SYSTEM,
   pronounce: PRONOUNCE_SYSTEM,
+  selectionTranslate: SELECTION_TRANSLATE_SYSTEM,
+  selectionLiteral: SELECTION_LITERAL_SYSTEM,
+  selectionAnalysis: SELECTION_ANALYSIS_SYSTEM,
 };
 
 export const PROMPT_JSON_EXAMPLES = {
@@ -17,9 +23,19 @@ export const PROMPT_JSON_EXAMPLES = {
   seed: '{"coverageBands":["junior","senior"],"extraLemmas":["nonetheless"]}',
   translate: '{"paragraphs":["English paragraph", "..."]}',
   pronounce: '{"text":"...","ipa":"/ˈwɛðər/","ipaUk":"","hint":"韦-德尔","hintUk":""}',
+  selectionTranslate: '{"kind":"sentence","translation":"...","partOfSpeech":"","note":""}',
+  selectionLiteral: '{"translation":"...","note":""}',
+  selectionAnalysis: '{"units":[{"source":"...","meaning":"...","role":"..."}],"structure":"...","usage":"..."}',
 };
 
 export const PROMPT_META = [
+  ...[
+    ["selectionTranslate", "即时翻译", "划词后优先显示自然译文，按单词、短语或句子调整内容。"],
+    ["selectionLiteral", "贴近原文", "按需提供贴近原文结构的译文，无差异时不强行改写。"],
+    ["selectionAnalysis", "词句解析", "按需提供词组/意群对照与关键句式解析。"],
+  ].map(([id, title, hint]) => ({
+    id, title, hint: `${hint} 不要改输出 JSON 结构 ${PROMPT_JSON_EXAMPLES[id]}。`,
+  })),
   {
     id: "gloss",
     title: "生词释义",
@@ -43,6 +59,9 @@ export const PROMPT_META = [
 ];
 
 const JSON_CHECKS = {
+  selectionTranslate: (obj) => ["word", "phrase", "sentence"].includes(obj?.kind) && typeof obj?.translation === "string",
+  selectionLiteral: (obj) => typeof obj?.translation === "string" && typeof obj?.note === "string",
+  selectionAnalysis: (obj) => Array.isArray(obj?.units) && obj.units.some((unit) => typeof unit?.source === "string" && typeof unit?.meaning === "string") && typeof obj?.structure === "string" && typeof obj?.usage === "string",
   gloss: (obj) =>
     Array.isArray(obj?.items) && obj.items.some((item) => item && "span" in item && "gloss" in item),
   seed: (obj) => Array.isArray(obj?.coverageBands) && Array.isArray(obj?.extraLemmas),

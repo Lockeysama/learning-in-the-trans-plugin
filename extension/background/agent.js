@@ -16,6 +16,7 @@ import { sendToTab } from "../shared/tab-bridge.js";
 import { normalizeGlossStyle } from "../shared/gloss-style.js";
 import { formatIpa, formatPronunciation } from "../shared/pronounce.js";
 import { emptyUsage, readUsage } from "../shared/usage.js";
+import { translationInput, translationResult } from "../shared/selection-translation.js";
 
 function ensureContextMenu() {
   chrome.contextMenus.removeAll(() => {
@@ -297,6 +298,21 @@ async function pronounceItem(text, sentence = "") {
   };
 }
 
+async function translateSelection(message) {
+  const input = translationInput(message.text, message.sentence, message.mode, message.natural);
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error("请先在设置中填写 API Key");
+  const prompts = await loadPrompts();
+  const promptId = { natural: "selectionTranslate", literal: "selectionLiteral", analysis: "selectionAnalysis" }[input.mode];
+  const payload = await callModel(promptId, {
+    apiKey,
+    system: prompts[promptId],
+    user: JSON.stringify(input),
+    maxTokens: input.mode === "analysis" ? 4000 : Math.min(2500, 300 + input.text.length * 2),
+  });
+  return { ok: true, ...translationResult(payload, input.mode) };
+}
+
 async function addUnknown(text) {
   const key = selectionToDraft(text) || String(text || "").toLowerCase().trim();
   if (!key) throw new Error("没有可用的英文词或短语");
@@ -544,6 +560,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return addKnown(message.text);
       case "PRONOUNCE":
         return pronounceItem(message.text, message.sentence);
+      // Interactive lookups must not wait behind a whole page's model queue.
+      case "TRANSLATE_SELECTION":
+        return translateSelection(message);
       case "SET_BANDS":
         return setBands(message.bands);
       case "CLEAR_LOGS":

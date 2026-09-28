@@ -27,6 +27,9 @@ python3 -m http.server 8767 --directory demo
 - 难度只移动熟词门槛：更易中文更多，更难英文更多
 - 模型失败时回原文
 - 不处理导航、侧栏；只改正文
+- 划词菜单提供「即时翻译」：默认只显示自然译文（单词显示语境释义与词性），「贴近原文」「词句解析」按需展开；固定搭配按词组解释，查询不会自动加入生词表
+- 划词加入熟词或生词后只保存词表，不立即重新处理当前页面；手动刷新页面后进入学习视图，或再次点击「学习视图」时应用最新词表
+- 即时翻译保留选区大小写、标点和附近上下文，支持英译中/中译英；每次最多 2000 字符。展开内容在当前选区内复用，失败可重试，Esc 或点击页面关闭
 - 右下角工具条不常驻：原文状态下不显示，只有进入学习视图（或正在处理）时才出现；`×` 可临时隐藏，下次从插件按钮激活时再出现
 - 判断正文时，工具类名不算侧栏/目录证据：Tailwind 这类带 `:`、`[]`、`@` 的 class（如 `toc-visible:md:grid-cols-10`）只是样式，不是页面 chrome。否则正文容器会被误判、正文被整段丢掉
 - 页面加载即自动注入：`manifest.content_scripts` 声明的必须是**经典脚本**。Chrome 不认 `"type": "module"`，会把带 `import` 的文件当经典脚本执行并抛 `SyntaxError`，整个内容脚本直接不运行。所以入口是 `content/bootstrap.js`，由它 `import()` 拉 `content/content.js`。往 `content_scripts.js` 加文件时保持经典脚本语法，`npm test` 会检查
@@ -36,7 +39,10 @@ python3 -m http.server 8767 --directory demo
 ```bash
 python3 scripts/build-lexicon.py
 npm test
+node scripts/check-selection-translation.mjs
 ```
+
+划词验收脚本会启动临时测试页和隔离的 Chrome，并在后台模拟模型响应；不需要真实 API Key。覆盖分层加载、上下文、错误重试、过期响应和菜单边界。
 
 真实 Chrome 的端到端验收（加载 `extension/`，打开演示页，点一次弹窗里的「学习视图」，断言页面进入学习视图、工具条按需出现/隐藏；模型调用在 service worker 里打桩，不需要 Key 和网络）：
 
@@ -57,4 +63,3 @@ HEADFUL=1 node scripts/diagnose-reading-view.mjs https://openai.com/index/some-p
 ```bash
 HEADFUL=1 node scripts/probe-page.mjs https://example.com/some-article
 ```
-
