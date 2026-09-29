@@ -20,7 +20,8 @@ import { emptyUsage, readUsage } from "../shared/usage.js";
 import { translationInput, translationResult } from "../shared/selection-translation.js";
 import { validateFullTranslation } from "../shared/full-translation.js";
 import { createTranslationCache } from "./translation-cache.js";
-import { KEY_INFO_MAX_CHARS, keyInfoRanges } from "../shared/key-info.js";
+import { KEY_INFO_MAX_CHARS, keyInfoRanges, restoreKeyInfoSource } from "../shared/key-info.js";
+import { annotateWithReview, keyInfoRequest } from "./key-info.js";
 
 const translationCache = createTranslationCache(chrome.storage.local);
 
@@ -306,13 +307,13 @@ async function annotateKeyInfo(text, ticket) {
   const apiKey = await getApiKey();
   if (!apiKey) throw new Error("请先在设置中填写 API Key");
   const prompts = await loadPrompts();
-  const annotated = await callPageModel(ticket, "keyInfo", {
-    apiKey, system: prompts.keyInfo, user: text, format: "text",
+  const annotated = await annotateWithReview(text, (reason, previous) => callPageModel(ticket, "keyInfo", {
+    apiKey, ...keyInfoRequest(text, prompts.keyInfo, reason, previous),
     maxTokens: Math.min(8000, 300 + text.length * 2),
   }, value => {
-    try { keyInfoRanges(text, value); return true; }
+    try { restoreKeyInfoSource(text, value); return true; }
     catch { return false; }
-  });
+  }));
   keyInfoRanges(text, annotated);
   return { annotated };
 }

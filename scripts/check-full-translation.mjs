@@ -50,7 +50,8 @@ try {
       if (!String(url).includes('api.deepseek.com')) return original(url, init);
       const body = JSON.parse(init.body);
       if (!body.response_format) {
-        const source = body.messages.at(-1).content;
+        const user = body.messages.at(-1).content;
+        const source = body.messages[0].content.includes('输入是 JSON：text') ? JSON.parse(user).text : user;
         __calls.push({ annotation: true, text: source });
         if (globalThis.__delayAnnotation) {
           globalThis.__delayAnnotation = false;

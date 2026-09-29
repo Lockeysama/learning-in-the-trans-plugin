@@ -34,7 +34,7 @@ export const PROMPT_JSON_EXAMPLES = {
 };
 
 export const PROMPT_META = [
-  { id: "keyInfo", title: "全文重点标注", hint: "对译文二次标注关键意群，只返回插入 **...** 的原文，禁止改写或输出 JSON。" },
+  { id: "keyInfo", title: "全文重点标注", hint: "优先突出结论、行动及成立条件，保留否定、范围和不确定性，减少背景与重复信息。只返回插入 **...** 的原文，禁止改写或输出 JSON。" },
   ...[
     ["fullTranslate", "全文翻译", "按指定目标语言翻译正文片段，结合段落上下文并保留片段编号。"],
     ["selectionTranslate", "即时翻译", "划词后优先显示自然译文，按单词、短语或句子调整内容。"],
