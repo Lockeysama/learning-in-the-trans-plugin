@@ -1,4 +1,4 @@
-import { chatJson } from "./deepseek.js";
+import { chatJson, chatText } from "./deepseek.js";
 import { recordBehavior, recordCall } from "./debug.js";
 import { bandsFromModel, clampExtraLemmas, lexiconOverview, loadJson, mergeKnownLemmas } from "./seed.js";
 import {
@@ -14,11 +14,13 @@ import { mergePrompts, promptOverrides, PROMPT_META, validatePrompts } from "../
 import { pageHost, shouldAutoLearnPage } from "../shared/site.js";
 import { sendToTab } from "../shared/tab-bridge.js";
 import { normalizeGlossStyle } from "../shared/gloss-style.js";
+import { normalizeKeyInfoStyle, normalizeTranslationConcurrency } from "../shared/translation-settings.js";
 import { formatIpa, formatPronunciation } from "../shared/pronounce.js";
 import { emptyUsage, readUsage } from "../shared/usage.js";
 import { translationInput, translationResult } from "../shared/selection-translation.js";
 import { validateFullTranslation } from "../shared/full-translation.js";
 import { createTranslationCache } from "./translation-cache.js";
+import { KEY_INFO_MAX_CHARS, keyInfoRanges } from "../shared/key-info.js";
 
 const translationCache = createTranslationCache(chrome.storage.local);
 
@@ -116,6 +118,7 @@ async function getState({ includeLemmas = true, includeCounts = true } = {}) {
     STORAGE_KEYS.autoLearnHosts,
     STORAGE_KEYS.debugEnabled,
     STORAGE_KEYS.usage,
+    STORAGE_KEYS.translationConcurrency,
   ]);
   const parts = await lexiconParts();
   const difficulty = data.difficulty || "default";
@@ -148,6 +151,7 @@ async function getState({ includeLemmas = true, includeCounts = true } = {}) {
     autoLearnHosts: data.autoLearnHosts || [],
     debugEnabled: Boolean(data.debugEnabled),
     usage: readUsage(data.usage),
+    translationConcurrency: normalizeTranslationConcurrency(data.translationConcurrency),
     knownCount: seedLemmas.length,
     readingCount: needLemmas ? knownLemmas.length : seedLemmas.length,
     knownLemmas,
@@ -162,14 +166,14 @@ async function loadPrompts() {
 
 async function callModel(action, args) {
   try {
-    const result = await chatJson(args);
+    const result = await (args.format === "text" ? chatText(args) : chatJson(args));
     await recordCall({
       action,
       request: result.request,
       rawContent: result.rawContent,
       usage: result.usage,
     });
-    return result.json;
+    return args.format === "text" ? result.rawContent : result.json;
   } catch (error) {
     await recordCall({
       action,
@@ -295,6 +299,22 @@ async function translateFullText({ items, targetLanguage }, ticket) {
     catch { return false; }
   });
   return validateFullTranslation(payload, items);
+}
+
+async function annotateKeyInfo(text, ticket) {
+  if (typeof text !== "string" || !text.trim() || text.length > KEY_INFO_MAX_CHARS) throw new Error("重点标注文本长度不正确");
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error("请先在设置中填写 API Key");
+  const prompts = await loadPrompts();
+  const annotated = await callPageModel(ticket, "keyInfo", {
+    apiKey, system: prompts.keyInfo, user: text, format: "text",
+    maxTokens: Math.min(8000, 300 + text.length * 2),
+  }, value => {
+    try { keyInfoRanges(text, value); return true; }
+    catch { return false; }
+  });
+  keyInfoRanges(text, annotated);
+  return { annotated };
 }
 
 async function pronounceItem(text, sentence = "") {
@@ -506,6 +526,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return translateParagraphs(message.paragraphs || [], ticket);
       case "TRANSLATE_FULL_TEXT":
         return translateFullText(message, ticket);
+      case "ANNOTATE_KEY_INFO":
+        return annotateKeyInfo(message.text, ticket);
       case "CLEAR_TRANSLATION_CACHE":
         await translationCache.clear(pageUrl);
         return { ok: true };
@@ -562,6 +584,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const glossStyle = normalizeGlossStyle(message.glossStyle);
         await chrome.storage.local.set({ [STORAGE_KEYS.glossStyle]: glossStyle });
         return { ok: true, glossStyle };
+      }
+      case "SAVE_TRANSLATION_CONCURRENCY": {
+        const translationConcurrency = normalizeTranslationConcurrency(message.translationConcurrency);
+        await chrome.storage.local.set({ [STORAGE_KEYS.translationConcurrency]: translationConcurrency });
+        return { ok: true, translationConcurrency };
+      }
+      case "SAVE_KEY_INFO_STYLE": {
+        const keyInfoStyle = normalizeKeyInfoStyle(message.keyInfoStyle);
+        await chrome.storage.local.set({ [STORAGE_KEYS.keyInfoStyle]: keyInfoStyle });
+        return { ok: true, keyInfoStyle };
       }
       case "GET_PROMPTS": {
         const data = await getStore([STORAGE_KEYS.prompts]);

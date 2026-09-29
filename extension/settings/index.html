@@ -16,7 +16,7 @@
           <a href="../debug/index.html">调试</a>
         </nav>
         <h1>翻译器设置</h1>
-        <p class="lead">密钥、释义外观、Prompt 和 Token。词表和初始化在词表页。</p>
+        <p class="lead">密钥、翻译并发、阅读外观、Prompt 和 Token。词表和初始化在词表页。</p>
       </header>
 
       <section class="card">
@@ -59,8 +59,52 @@
       </section>
 
       <section class="card">
+        <h2>全文翻译并发</h2>
+        <p class="hint">每个页面分别限制翻译和重点标注的同时请求数，默认都是 5，可设为 1–10。保存后从下一轮翻译开始生效。</p>
+        <div class="appearance-grid">
+          <div class="appearance-field">
+            <label for="translationConcurrency">翻译并发数</label>
+            <input id="translationConcurrency" type="number" min="1" max="10" step="1" value="5" required />
+          </div>
+          <div class="appearance-field">
+            <label for="annotationConcurrency">重点标注并发数</label>
+            <input id="annotationConcurrency" type="number" min="1" max="10" step="1" value="5" required />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="saveConcurrency">保存并发设置</button>
+          <button type="button" class="secondary" id="resetConcurrency">恢复默认</button>
+        </div>
+        <p class="status" id="concurrencyStatus" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>重点标注外观</h2>
+        <p class="hint">用于全文翻译中的关键意群，修改后自动保存，已打开的译文立即生效，无需重新翻译。</p>
+        <div class="appearance-grid">
+          <label class="choice"><input id="keyInfoBold" type="checkbox" checked />粗体</label>
+          <div class="appearance-field">
+            <label for="keyInfoColor">字体颜色</label>
+            <input id="keyInfoColor" type="color" value="#15803d" />
+          </div>
+          <div class="appearance-field">
+            <label class="choice"><input id="keyInfoNoBackground" type="checkbox" checked />无背景色</label>
+            <div class="row">
+              <label for="keyInfoBackground">背景颜色</label>
+              <input id="keyInfoBackground" type="color" value="#dcfce7" disabled />
+            </div>
+          </div>
+        </div>
+        <p class="gloss-preview" id="keyInfoPreview"><strong class="littp-key-info">如果网络断开</strong>，请<strong class="littp-key-info">暂停上传</strong>，连接恢复后再继续。</p>
+        <div class="actions">
+          <button type="button" class="secondary" id="resetKeyInfoStyle">恢复默认</button>
+        </div>
+        <p class="status" id="keyInfoStatus" role="status"></p>
+      </section>
+
+      <section class="card">
         <h2>Prompt</h2>
-        <p class="hint">这三条会作为模型的 system 指令。可以改任务说明，但不要改输出 JSON 的字段和结构，否则程序无法解析、保存也会报错。留空并保存等于恢复该条默认。</p>
+        <p class="hint">这些内容会作为模型的 system 指令。请保留各项要求的输出格式：翻译使用 JSON，重点标注只插入 Markdown 粗体。留空并保存等于恢复该条默认。</p>
         <div id="promptList"></div>
         <p class="status" id="promptStatus"></p>
         <div class="actions">

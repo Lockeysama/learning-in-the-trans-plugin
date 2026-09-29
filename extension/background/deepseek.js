@@ -14,7 +14,7 @@ function extractJson(content) {
   }
 }
 
-export async function chatJson({ apiKey, system, user, maxTokens = 2048 }) {
+async function chat({ apiKey, system, user, maxTokens = 2048 }, jsonMode) {
   if (!apiKey) throw new Error("missing_api_key");
   const body = {
     model: MODEL,
@@ -23,7 +23,7 @@ export async function chatJson({ apiKey, system, user, maxTokens = 2048 }) {
       { role: "user", content: user },
     ],
     thinking: { type: "disabled" },
-    response_format: { type: "json_object" },
+    ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     max_tokens: maxTokens,
     temperature: 0.2,
     stream: false,
@@ -48,7 +48,7 @@ export async function chatJson({ apiKey, system, user, maxTokens = 2048 }) {
   }
   const content = data?.choices?.[0]?.message?.content;
   return {
-    json: extractJson(content),
+    ...(jsonMode ? { json: extractJson(content) } : {}),
     rawContent: content || "",
     usage: readUsage(data?.usage),
     request: {
@@ -59,3 +59,6 @@ export async function chatJson({ apiKey, system, user, maxTokens = 2048 }) {
     },
   };
 }
+
+export function chatJson(args) { return chat(args, true); }
+export function chatText(args) { return chat(args, false); }

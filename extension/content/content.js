@@ -39,6 +39,7 @@ import { shouldAutoLearnPage } from "../shared/site.js";
 import { mountSelector } from "./select.js";
 import { mountToolbar, setToolbar } from "./toolbar.js";
 import { translateFullText } from "./full-translation.js";
+import { applyKeyInfoStyle } from "./key-info-style.js";
 
 const alreadyLoaded = Boolean(globalThis.__littpLoaded);
 globalThis.__littpLoaded = true;
@@ -209,8 +210,9 @@ function hydrateTarget(target, lexiconKey) {
 }
 
 async function loadGlossStyle() {
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.glossStyle);
+  const stored = await chrome.storage.local.get([STORAGE_KEYS.glossStyle, STORAGE_KEYS.keyInfoStyle]);
   applyGlossStyle(stored[STORAGE_KEYS.glossStyle]);
+  applyKeyInfoStyle(stored[STORAGE_KEYS.keyInfoStyle]);
 }
 
 function refreshGlossPresentation(target, lexiconKey) {
@@ -242,16 +244,17 @@ async function processTarget(target, state, { force = false, lexiconKey, view = 
   if (!work) return { cached: false, skipped: true };
   try {
     if (view === "translated") {
-      await translateFullText(work, targetLanguage, sendRuntime, {
+      const annotation = await translateFullText(work, targetLanguage, sendRuntime, {
         checkCurrent,
-        onBatch: (done, total) => {
+        concurrency: state.translationConcurrency,
+        onBatch: (done, total, stage) => {
           checkCurrent?.();
           copyProcessedHtml(target, work);
-          updateBar({ status: `全文翻译中 ${done}/${total}…` });
+          updateBar({ status: stage === "annotation" && done === total ? "译文已显示，正在标注重点…" : `全文翻译中 ${done}/${total}…` });
         },
       });
       checkCurrent?.();
-      saveTranslation(target, work, targetLanguage);
+      saveTranslation(target, work, targetLanguage, annotation);
       return { cached: false };
     }
     const lang = detectLang(work.textContent || work.innerText || "");
@@ -684,6 +687,7 @@ if (!alreadyLoaded) {
     if (area !== "local") return;
     if (changes.debugEnabled) debugEnabled = Boolean(changes.debugEnabled.newValue);
     if (changes.glossStyle) applyGlossStyle(changes.glossStyle.newValue);
+    if (changes.keyInfoStyle) applyKeyInfoStyle(changes.keyInfoStyle.newValue);
     if (changes.autoLearnHosts) scheduleAutoLearn();
     // Vocabulary edits are saved immediately but applied on the next manual
     // refresh/processing pass, so marking a word does not interrupt reading.

@@ -1,4 +1,5 @@
-export const QUEUED_MESSAGE_TYPES = new Set(["GLOSS", "TRANSLATE_PARAS", "TRANSLATE_FULL_TEXT", "GENERATE_SEED", "PRONOUNCE"]);
+// Full-page translation has its own bounded pool in the content script.
+export const QUEUED_MESSAGE_TYPES = new Set(["GLOSS", "TRANSLATE_PARAS", "GENERATE_SEED", "PRONOUNCE"]);
 
 export function shouldQueueMessage(type) {
   return QUEUED_MESSAGE_TYPES.has(type);

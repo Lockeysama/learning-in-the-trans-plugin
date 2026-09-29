@@ -2,6 +2,8 @@ import { applyGlossStyle } from "../content/render.js";
 import { DEFAULT_GLOSS_STYLE, normalizeGlossStyle } from "../shared/gloss-style.js";
 import { formatTokens } from "../shared/usage.js";
 import { validatePrompts } from "../shared/prompts.js";
+import { applyKeyInfoStyle } from "../content/key-info-style.js";
+import { DEFAULT_KEY_INFO_STYLE, DEFAULT_TRANSLATION_CONCURRENCY, normalizeKeyInfoStyle, normalizeTranslationConcurrency } from "../shared/translation-settings.js";
 
 const apiKey = document.getElementById("apiKey");
 const keyStatus = document.getElementById("keyStatus");
@@ -14,6 +16,71 @@ const glossColor = document.getElementById("glossColor");
 const glossStatus = document.getElementById("glossStatus");
 let promptDefaults = {};
 let glossSaveTimer = 0;
+const translationConcurrency = document.getElementById("translationConcurrency");
+const annotationConcurrency = document.getElementById("annotationConcurrency");
+const concurrencyStatus = document.getElementById("concurrencyStatus");
+const keyInfoBold = document.getElementById("keyInfoBold");
+const keyInfoColor = document.getElementById("keyInfoColor");
+const keyInfoNoBackground = document.getElementById("keyInfoNoBackground");
+const keyInfoBackground = document.getElementById("keyInfoBackground");
+const keyInfoStatus = document.getElementById("keyInfoStatus");
+let keyInfoSaveTimer = 0;
+let keyInfoSaveQueue = Promise.resolve();
+
+function paintConcurrency(raw) {
+  const next = normalizeTranslationConcurrency(raw);
+  translationConcurrency.value = next.translation;
+  annotationConcurrency.value = next.annotation;
+}
+
+async function saveConcurrency(value) {
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "SAVE_TRANSLATION_CONCURRENCY", translationConcurrency: value });
+    if (result?.error) throw new Error(result.error);
+    paintConcurrency(result.translationConcurrency);
+    concurrencyStatus.className = "status";
+    concurrencyStatus.textContent = "已保存，下一轮全文翻译生效";
+  } catch (error) {
+    concurrencyStatus.className = "status error";
+    concurrencyStatus.textContent = error.message || "保存失败，请重试";
+  }
+}
+
+function paintKeyInfoStyle(raw) {
+  const next = normalizeKeyInfoStyle(raw);
+  keyInfoBold.checked = next.bold;
+  keyInfoColor.value = next.color;
+  keyInfoNoBackground.checked = next.backgroundColor === "transparent";
+  keyInfoBackground.disabled = keyInfoNoBackground.checked;
+  if (!keyInfoNoBackground.checked) keyInfoBackground.value = next.backgroundColor;
+  applyKeyInfoStyle(next);
+}
+
+function saveKeyInfoStyle(style) {
+  // Preserve save order while the color picker emits rapid changes.
+  keyInfoSaveQueue = keyInfoSaveQueue.then(async () => {
+    try {
+      const result = await chrome.runtime.sendMessage({ type: "SAVE_KEY_INFO_STYLE", keyInfoStyle: style });
+      if (result?.error) throw new Error(result.error);
+      keyInfoStatus.className = "status";
+      keyInfoStatus.textContent = "已保存，打开中的全文译文已生效";
+    } catch (error) {
+      keyInfoStatus.className = "status error";
+      keyInfoStatus.textContent = error.message || "保存失败，请重试";
+    }
+  });
+}
+
+function scheduleKeyInfoSave() {
+  const next = normalizeKeyInfoStyle({
+    bold: keyInfoBold.checked,
+    color: keyInfoColor.value,
+    backgroundColor: keyInfoNoBackground.checked ? "transparent" : keyInfoBackground.value,
+  });
+  paintKeyInfoStyle(next);
+  clearTimeout(keyInfoSaveTimer);
+  keyInfoSaveTimer = setTimeout(() => saveKeyInfoStyle(next), 150);
+}
 
 function renderPrompts(prompts = {}, defaults = {}, meta = []) {
   promptDefaults = defaults;
@@ -109,11 +176,13 @@ function renderUsage(usage = {}) {
 async function refresh() {
   const [stats, stored, promptData] = await Promise.all([
     chrome.runtime.sendMessage({ type: "GET_STATS" }),
-    chrome.storage.local.get(["apiKey", "glossStyle"]),
+    chrome.storage.local.get(["apiKey", "glossStyle", "translationConcurrency", "keyInfoStyle"]),
     chrome.runtime.sendMessage({ type: "GET_PROMPTS" }),
   ]);
   if (stored.apiKey) apiKey.value = stored.apiKey;
   paintGlossStyle(stored.glossStyle);
+  paintConcurrency(stored.translationConcurrency);
+  paintKeyInfoStyle(stored.keyInfoStyle);
   renderUsage(stats.usage || {});
   if (promptData?.prompts) {
     renderPrompts(promptData.prompts, promptData.defaults || {}, promptData.meta || []);
@@ -134,6 +203,20 @@ document.getElementById("saveKey").onclick = async () => {
 
 glossSize.addEventListener("input", scheduleGlossSave);
 glossColor.addEventListener("input", scheduleGlossSave);
+
+document.getElementById("saveConcurrency").onclick = () => {
+  if (!translationConcurrency.reportValidity() || !annotationConcurrency.reportValidity()) return;
+  saveConcurrency({ translation: translationConcurrency.valueAsNumber, annotation: annotationConcurrency.valueAsNumber });
+};
+document.getElementById("resetConcurrency").onclick = () => saveConcurrency(DEFAULT_TRANSLATION_CONCURRENCY);
+for (const input of [keyInfoBold, keyInfoColor, keyInfoNoBackground, keyInfoBackground]) {
+  input.addEventListener("input", scheduleKeyInfoSave);
+}
+document.getElementById("resetKeyInfoStyle").onclick = () => {
+  clearTimeout(keyInfoSaveTimer);
+  paintKeyInfoStyle(DEFAULT_KEY_INFO_STYLE);
+  saveKeyInfoStyle(DEFAULT_KEY_INFO_STYLE);
+};
 
 document.getElementById("resetGlossStyle").onclick = async () => {
   clearTimeout(glossSaveTimer);

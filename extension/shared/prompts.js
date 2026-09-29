@@ -2,6 +2,7 @@ import {
   GLOSS_SYSTEM,
   PARAGRAPH_SYSTEM,
   FULL_TRANSLATION_SYSTEM,
+  KEY_INFO_SYSTEM,
   PRONOUNCE_SYSTEM,
   SEED_SYSTEM,
   SELECTION_TRANSLATE_SYSTEM,
@@ -14,6 +15,7 @@ export const DEFAULT_PROMPTS = {
   seed: SEED_SYSTEM,
   translate: PARAGRAPH_SYSTEM,
   fullTranslate: FULL_TRANSLATION_SYSTEM,
+  keyInfo: KEY_INFO_SYSTEM,
   pronounce: PRONOUNCE_SYSTEM,
   selectionTranslate: SELECTION_TRANSLATE_SYSTEM,
   selectionLiteral: SELECTION_LITERAL_SYSTEM,
@@ -32,6 +34,7 @@ export const PROMPT_JSON_EXAMPLES = {
 };
 
 export const PROMPT_META = [
+  { id: "keyInfo", title: "全文重点标注", hint: "对译文二次标注关键意群，只返回插入 **...** 的原文，禁止改写或输出 JSON。" },
   ...[
     ["fullTranslate", "全文翻译", "按指定目标语言翻译正文片段，结合段落上下文并保留片段编号。"],
     ["selectionTranslate", "即时翻译", "划词后优先显示自然译文，按单词、短语或句子调整内容。"],

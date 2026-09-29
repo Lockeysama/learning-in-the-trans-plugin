@@ -115,15 +115,16 @@ export function refreshSource(root, viewingLearning = false) {
 
 export function showTranslation(root, targetLanguage) {
   const meta = root[TRANSLATION_META];
+  if (meta?.annotationComplete === false) return false;
   if (!meta || meta.targetLanguage !== targetLanguage || meta.sourceHash !== hashText(sourceHtml(root))) return false;
   assignHtml(root, root[TRANSLATION]);
   return true;
 }
 
-export function saveTranslation(root, work, targetLanguage) {
+export function saveTranslation(root, work, targetLanguage, { annotationComplete = true } = {}) {
   copyProcessedHtml(root, work);
   root[TRANSLATION] = root.innerHTML;
-  root[TRANSLATION_META] = { targetLanguage, sourceHash: hashText(root[ORIGINAL]) };
+  root[TRANSLATION_META] = { targetLanguage, sourceHash: hashText(root[ORIGINAL]), annotationComplete };
   discardWork(work);
 }
 

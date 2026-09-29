@@ -158,6 +158,18 @@ textarea {
   align-items: center;
 }
 
+.appearance-field input[type="number"] {
+  width: 8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+input[type="color"]:disabled { opacity: 0.4; cursor: default; }
+
 input[type="range"] {
   flex: 1;
   min-width: 12rem;
