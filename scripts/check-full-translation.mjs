@@ -57,11 +57,16 @@ try {
           globalThis.__delayAnnotation = false;
           await new Promise(resolve => { globalThis.__releaseAnnotation = resolve; });
         }
-        const content = globalThis.__badAnnotations ? '改写后的错误内容' : source.replace('自然通顺的中文译文', '**自然通顺的中文译文**').replace('English translation', '**English translation**');
+        const bad = globalThis.__badAnnotations || (globalThis.__badAnnotationForTitle && source.includes('Reading and understanding'));
+        const content = bad ? '改写后的错误内容' : source.replace('自然通顺的中文译文', '**自然通顺的中文译文**').replace('English translation', '**English translation**').replace('reliable internet access', '**reliable internet access**').replace('沿着河堤慢慢走', '**沿着河堤慢慢走**');
         return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: {} }), { status: 200 });
       }
       const input = JSON.parse(body.messages.at(-1).content);
       __calls.push(input);
+      if (input.items && !input.targetLanguage && globalThis.__failGloss) {
+        await new Promise(resolve => { globalThis.__releaseGlossError = resolve; });
+        return new Response(JSON.stringify({ error: { message: '模拟生词标注失败' } }), { status: 503 });
+      }
       if (input.targetLanguage && globalThis.__holdTranslations) {
         __activeTranslations++;
         __maxTranslations = Math.max(__maxTranslations, __activeTranslations);
@@ -75,7 +80,7 @@ try {
       if (input.targetLanguage) payload = { items: input.items.map(item => ({ id: item.id, translation: input.targetLanguage === 'zh' ? '这是自然通顺的中文译文，完整保留了原文的含义，并帮助读者理解文章中的重要信息。' : 'This is the English translation of the original Chinese article, preserving its meaning and information.' })) };
       else if (input.items) payload = { items: input.items.map(item => ({ span: item.span, gloss: '测试释义' })) };
       else payload = { paragraphs: input.paragraphs.map(() => 'An English paragraph with unfamiliar phenomena.') };
-      if (globalThis.__invalidNext) { globalThis.__invalidNext = false; payload = { items: [] }; }
+      if (globalThis.__invalidNext || (input.targetLanguage && __calls.filter(c => c.targetLanguage).length === globalThis.__invalidAtFull)) { globalThis.__invalidNext = false; payload = { items: [] }; }
       return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(payload) } }], usage: {} }), { status: 200 });
     };
   })()`);
@@ -87,7 +92,7 @@ try {
   popup = (await harness.openTarget(`chrome-extension://${worker.id}/popup/popup.html`, { background: true })).client;
   await harness.activateTarget(target.target.id);
   await until(popup, `window.__tabUrl === ${JSON.stringify(`${url}/en`)}`);
-  check("popup has three view choices in order", await popup.evaluate(`[...document.querySelectorAll('.switch button')].map(b => b.textContent).join(',') === '原文,学习视图,全文翻译'`));
+  check("popup has four view choices in order", await popup.evaluate(`[...document.querySelectorAll('.switch button')].map(b => b.textContent).join(',') === '原文,学习视图,全文翻译,重点标记'`));
   await sw.evaluate("globalThis.__delayAtFull = 2; globalThis.__delayAnnotation = true");
   await popupClick("translate");
   await until(sw, "Boolean(globalThis.__release)");
@@ -175,10 +180,37 @@ try {
   await sw.evaluate("globalThis.__invalidNext = true");
   await popupClick("translate");
   await until(popup, "document.getElementById('message').textContent.includes('全文翻译结果不完整')");
-  check("invalid translation reports an error and restores source", await page.evaluate("document.querySelector('article').innerHTML") === originalHtml);
-  await popupClick("translate");
+  check("invalid translation keeps requested mode and shows a retry notice", await page.evaluate(`${bar}.getElementById('translated').dataset.active === 'true' && !${bar}.getElementById('notice').hidden`));
+  await click("retry");
   await mode("translated");
-  check("retry after failure succeeds", true);
+  await until(page, `${bar}.getElementById('status').textContent === '全文 · 中文'`);
+  check("notice retry succeeds and dismisses the notice", await page.evaluate(`${bar}.getElementById('notice').hidden`));
+
+  await popupClick("clearCache");
+  await mode("original");
+  await sw.evaluate("(async () => { await chrome.storage.local.set({translationConcurrency: {translation: 1, annotation: 5}}); globalThis.__invalidAtFull = __calls.filter(c => c.targetLanguage).length + 2; })()");
+  await popupClick("translate");
+  await until(popup, "document.getElementById('message').textContent.includes('全文翻译结果不完整')");
+  check("a later failed translation batch preserves earlier translations and annotations", await page.evaluate(`document.querySelector('article').textContent.includes('中文译文') && document.querySelector('article').textContent.includes('reliable internet') && Boolean(document.querySelector('strong.littp-key-info')) && ${bar}.getElementById('translated').dataset.active === 'true'`));
+  const noticeScreenshot = await page.send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(join(tmpdir(), "littp-processing-notice.png"), Buffer.from(noticeScreenshot.data, "base64"));
+  const callsAfterPartial = await callCount();
+  await sw.evaluate("(async () => { globalThis.__invalidAtFull = null; await chrome.storage.local.set({translationConcurrency: {translation: 5, annotation: 5}}); })()");
+  await popupClick("translate");
+  await until(page, `${bar}.getElementById('status').textContent === '全文 · 中文'`);
+  check("manual retry reuses the successful translation batch", await callCount() === callsAfterPartial + 1);
+
+  await sw.evaluate("globalThis.__failGloss = true");
+  await popupClick("learn");
+  await until(sw, "Boolean(globalThis.__releaseGlossError)");
+  const beforeLearningFailure = await page.evaluate("document.querySelector('article').innerHTML");
+  await sw.evaluate("globalThis.__releaseGlossError(); globalThis.__releaseGlossError = null;");
+  await until(popup, "document.getElementById('message').textContent.includes('模拟生词标注失败')");
+  check("learning annotation failure keeps displayed progress and requested mode", await page.evaluate("document.querySelector('article').innerHTML") === beforeLearningFailure && await page.evaluate(`${bar}.getElementById('learning').dataset.active === 'true' && !${bar}.getElementById('notice').hidden`));
+  await sw.evaluate("globalThis.__failGloss = false");
+  await click("retry");
+  await until(page, `${bar}.getElementById('status').textContent === '学习视图'`);
+  check("learning view can retry after a model error", await page.evaluate("Boolean(document.querySelector('.littp-gloss'))"));
 
   await popupClick("clearCache");
   await mode("original");
@@ -198,12 +230,60 @@ try {
   await popupClick("translate");
   await mode("translated");
   check("invalid annotations leave the complete translation visible", await page.evaluate("!document.querySelector('strong.littp-key-info') && !document.querySelector('article').textContent.includes('改写后的错误内容')") && await page.evaluate("document.querySelector('article').textContent") === highlightedText);
+  check("failed annotations show a notice while keeping translated mode", await page.evaluate(`!${bar}.getElementById('notice').hidden && ${bar}.getElementById('noticeText').textContent.includes('重点标记未完成')`));
   const beforeRetry = await callCount();
   await sw.evaluate("globalThis.__badAnnotations = false");
   await click("translated");
   await until(page, "Boolean(document.querySelector('strong.littp-key-info'))");
   await until(page, `${bar}.getElementById('status').textContent === '全文 · 中文'`);
   check("retrying annotation does not repeat translation", await callCount() === beforeRetry);
+
+  // Independent highlighting always reads the original, including when entered
+  // from a translated view, and never calls either translation API.
+  const beforeHighlightCalls = await sw.evaluate("__calls.filter(c => !c.annotation).length");
+  await popupClick("highlight");
+  await mode("highlighted");
+  const sourceText = await page.evaluate(`(() => { const el = document.createElement('div'); el.innerHTML = ${JSON.stringify(originalHtml)}; return el.textContent; })()`);
+  check("standalone highlighting preserves source text with no translation calls", await page.evaluate("document.querySelector('article').textContent") === sourceText && await page.evaluate("Boolean(document.querySelector('strong.littp-key-info')) && !document.querySelector('.littp-gloss')") && await sw.evaluate("__calls.filter(c => !c.annotation).length") === beforeHighlightCalls);
+  check("standalone highlighting preserves links, emphasis and code", await page.evaluate("document.getElementById('link').getAttribute('href') === '/reference' && document.getElementById('emphasis').tagName === 'EM' && document.getElementById('code').textContent === 'const value = 42;'"));
+  await until(popup, "document.getElementById('highlight').getAttribute('aria-pressed') === 'true'");
+  const highlightScreenshot = await page.send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(join(tmpdir(), "littp-standalone-highlight.png"), Buffer.from(highlightScreenshot.data, "base64"));
+  const popupScreenshot = await popup.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: 320, height: 450, scale: 1 } });
+  writeFileSync(join(tmpdir(), "littp-view-popup.png"), Buffer.from(popupScreenshot.data, "base64"));
+  const beforeHighlightCache = await sw.evaluate("__calls.length");
+  await click("original");
+  check("original after highlighting restores exact HTML", await page.evaluate("document.querySelector('article').innerHTML") === originalHtml);
+  await click("highlighted");
+  await mode("highlighted");
+  check("standalone highlighting has its own reusable cache", await sw.evaluate("__calls.length") === beforeHighlightCache);
+  await click("translated");
+  await mode("translated");
+  check("standalone highlighting does not overwrite translation cache", await callCount() === beforeRetry);
+
+  await popupClick("clearCache");
+  await mode("original");
+  await sw.evaluate("globalThis.__badAnnotationForTitle = true");
+  await popupClick("highlight");
+  await mode("highlighted");
+  check("one standalone annotation failure preserves other highlights and shows notice", await page.evaluate(`document.querySelector('article').textContent === ${JSON.stringify(sourceText)} && Boolean(document.querySelector('p strong.littp-key-info')) && !${bar}.getElementById('notice').hidden`));
+  const beforeHighlightRetry = await sw.evaluate("__calls.filter(c => c.annotation).length");
+  await click("dismissNotice");
+  check("closing the notice keeps highlighted mode and successful marks", await page.evaluate(`${bar}.getElementById('notice').hidden && ${bar}.getElementById('highlighted').dataset.active === 'true' && Boolean(document.querySelector('p strong.littp-key-info'))`));
+  await sw.evaluate("globalThis.__badAnnotationForTitle = false");
+  await click("highlighted");
+  await until(page, `${bar}.getElementById('status').textContent === '重点标记'`);
+  check("standalone retry only requests the failed scope", await sw.evaluate("__calls.filter(c => c.annotation).length") === beforeHighlightRetry + 1);
+
+  await popupClick("clearCache");
+  await mode("original");
+  await sw.evaluate("globalThis.__delayAnnotation = true");
+  await popupClick("highlight");
+  await until(sw, "Boolean(globalThis.__releaseAnnotation)");
+  await click("original");
+  await sw.evaluate("globalThis.__releaseAnnotation(); globalThis.__releaseAnnotation = null");
+  await sleep(250);
+  check("late standalone annotations cannot overwrite restored original", await page.evaluate("document.querySelector('article').innerHTML") === originalHtml);
 
   await popupClick("clearCache");
   await mode("original");
@@ -223,6 +303,11 @@ try {
   check("Chinese article translates into English", await page.evaluate("document.querySelector('article').textContent.includes('English translation')") && await sw.evaluate("__calls.filter(c => c.targetLanguage).at(-1).targetLanguage === 'en'"));
   await click("original");
   check("Chinese original is restored", await page.evaluate("document.querySelector('article').textContent.includes('沿着河堤')"));
+  const chineseSource = await page.evaluate("document.querySelector('article').textContent");
+  const beforeChineseHighlight = await sw.evaluate("__calls.filter(c => !c.annotation).length");
+  await click("highlighted");
+  await mode("highlighted");
+  check("Chinese standalone highlighting preserves source without translation", await page.evaluate("document.querySelector('article').textContent") === chineseSource && await page.evaluate("Boolean(document.querySelector('p strong.littp-key-info'))") && await sw.evaluate("__calls.filter(c => !c.annotation).length") === beforeChineseHighlight);
   const inline = await page.evaluate(`(async () => {
     const { createKeyInfoAnnotator } = await import('chrome-extension://${worker.id}/content/key-info.js');
     const work = document.createElement('div');

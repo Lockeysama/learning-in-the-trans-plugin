@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { validateFullTranslation } from "../extension/shared/full-translation.js";
-import { snapshot, saveLearning, showLearning, showTranslation, saveTranslation, restore, clearTargetCache, refreshSource, sourceHtml } from "../extension/content/original.js";
+import { snapshot, saveLearning, showLearning, showTranslation, saveTranslation, showHighlight, saveHighlight, restore, clearTargetCache, refreshSource, sourceHtml } from "../extension/content/original.js";
 
 test("full translation aligns reordered outputs and rejects missing, duplicate or empty items", () => {
   const input = [{ id: "0", text: "first" }, { id: "1", text: "second" }];
@@ -9,6 +9,31 @@ test("full translation aligns reordered outputs and rejects missing, duplicate o
   for (const items of [[], [{ id: "0", translation: "第一" }, { id: "0", translation: "重复" }], [{ id: "0", translation: "" }, { id: "1", translation: "第二" }], [{ id: "0", translation: "第一" }, { id: "2", translation: "错位" }]]) {
     assert.throws(() => validateFullTranslation({ items }, input), /全文翻译/);
   }
+});
+
+test("standalone highlighting caches source markup separately and retries incomplete annotations", () => {
+  const root = { innerHTML: "Original article", children: [] };
+  snapshot(root);
+  saveTranslation(root, { innerHTML: "Translated article", children: [] }, "zh");
+  saveHighlight(root, { innerHTML: "Original <strong>article</strong>", children: [] });
+  assert.equal(sourceHtml(root), "Original article");
+  restore(root);
+  assert.equal(showHighlight(root), true);
+  assert.equal(root.innerHTML, "Original <strong>article</strong>");
+  assert.equal(showTranslation(root, "zh"), true);
+  assert.equal(root.innerHTML, "Translated article");
+  saveHighlight(root, { innerHTML: "Partly highlighted", children: [] }, { annotationComplete: false });
+  assert.equal(root.innerHTML, "Partly highlighted");
+  assert.equal(showHighlight(root), false);
+  restore(root);
+  root.innerHTML = "Changed source";
+  refreshSource(root);
+  assert.equal(showHighlight(root), false);
+  assert.equal(showTranslation(root, "zh"), false);
+  saveHighlight(root, { innerHTML: "Changed <strong>source</strong>", children: [] });
+  clearTargetCache(root);
+  assert.equal(root.innerHTML, "Changed source");
+  assert.equal(showHighlight(root), false);
 });
 
 test("original, learning and translation caches stay independent and invalidate with the source", () => {

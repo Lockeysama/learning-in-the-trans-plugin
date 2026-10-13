@@ -4,6 +4,22 @@ import { normalizeTranslationConcurrency } from "../shared/translation-settings.
 
 const BLOCKS = "p,li,h1,h2,h3,h4,h5,h6,blockquote,td,th,figcaption,div,pre";
 const PROTECTED = "script,style,noscript,textarea,input,code,pre,kbd,samp,math,svg,button,select,option,[contenteditable]";
+const SKIP = `${PROTECTED},#littp-toolbar-host,#littp-select-host,.littp-gloss`;
+
+// Mark source text with the same scope validation and concurrency as translated text.
+export async function highlightKeyInfo(work, request, options = {}) {
+  const groups = [];
+  const walker = work.ownerDocument.createTreeWalker(work, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return /\p{L}/u.test(node.nodeValue || "") && !node.parentElement?.closest(SKIP) && !isInsideChrome(node.parentElement)
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    },
+  });
+  while (walker.nextNode()) groups.push({ node: walker.currentNode, pending: 0 });
+  const annotator = createKeyInfoAnnotator(work, groups, request, options);
+  annotator.flush();
+  return annotator.finish();
+}
 
 function applyRanges(scope, ranges) {
   let offset = 0;
@@ -57,6 +73,7 @@ export function createKeyInfoAnnotator(work, groups, request, { checkCurrent, on
   const waiting = [];
   const active = new Set();
   let failures = 0;
+  let annotationError = "";
   async function annotate(scope) {
     checkCurrent?.();
     const text = scope.nodes.map(node => node.nodeValue).join("");
@@ -78,7 +95,7 @@ export function createKeyInfoAnnotator(work, groups, request, { checkCurrent, on
     while (waiting.length && active.size < limit) {
       const scope = waiting.shift();
       const job = Promise.resolve().then(() => annotate(scope))
-        .catch(() => { failures += 1; })
+        .catch(error => { failures += 1; annotationError ||= error.message || "重点标记失败"; })
         .finally(() => { active.delete(job); pump(); });
       active.add(job);
     }
@@ -97,7 +114,7 @@ export function createKeyInfoAnnotator(work, groups, request, { checkCurrent, on
     async finish() {
       while (active.size) await Promise.all([...active]);
       checkCurrent?.();
-      return { annotationComplete: failures === 0 };
+      return { annotationComplete: failures === 0, annotationError };
     },
   };
 }

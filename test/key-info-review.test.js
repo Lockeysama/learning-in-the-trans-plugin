@@ -79,7 +79,7 @@ test("repeated substantive highlights request a semantic review, not automatic d
 
 test("semantic rewrites remain rejected and retry count is bounded", async () => {
   let calls = 0;
-  await assert.rejects(annotateWithReview("错误可能表现为 404.", async () => { calls++; return "错误可能表现为 **403**。"; }), /改动了译文/);
+  await assert.rejects(annotateWithReview("错误可能表现为 404.", async () => { calls++; return "错误可能表现为 **403**。"; }), /改动了正文/);
   assert.equal(calls, 2);
 });
 

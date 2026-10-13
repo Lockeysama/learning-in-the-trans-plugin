@@ -5,6 +5,8 @@ const LEARNING = "_littpLearning";
 const CACHE_META = "_littpCacheMeta";
 const TRANSLATION = "_littpTranslation";
 const TRANSLATION_META = "_littpTranslationMeta";
+const HIGHLIGHT = "_littpHighlight";
+const HIGHLIGHT_META = "_littpHighlightMeta";
 export const SESSION_PREFIX = "littp-cache:";
 
 export function hashText(text) {
@@ -84,6 +86,7 @@ export function sourceHtml(root, viewingLearning = false) {
     return root[ORIGINAL];
   }
   if (root[TRANSLATION] != null && root.innerHTML === root[TRANSLATION] && root[ORIGINAL] != null) return root[ORIGINAL];
+  if (root[HIGHLIGHT] != null && root.innerHTML === root[HIGHLIGHT] && root[ORIGINAL] != null) return root[ORIGINAL];
   return root.innerHTML;
 }
 
@@ -105,12 +108,29 @@ export function refreshSource(root, viewingLearning = false) {
   if (viewingLearning) return;
   if (root[LEARNING] != null && root.innerHTML === root[LEARNING]) return;
   if (root[TRANSLATION] != null && root.innerHTML === root[TRANSLATION]) return;
+  if (root[HIGHLIGHT] != null && root.innerHTML === root[HIGHLIGHT]) return;
   if (root[ORIGINAL] != null && root.innerHTML === root[ORIGINAL]) return;
   root[ORIGINAL] = root.innerHTML;
   delete root[LEARNING];
   delete root[CACHE_META];
   delete root[TRANSLATION];
   delete root[TRANSLATION_META];
+  delete root[HIGHLIGHT];
+  delete root[HIGHLIGHT_META];
+}
+
+export function showHighlight(root) {
+  const meta = root[HIGHLIGHT_META];
+  if (!meta || !meta.annotationComplete || meta.sourceHash !== hashText(sourceHtml(root))) return false;
+  assignHtml(root, root[HIGHLIGHT]);
+  return true;
+}
+
+export function saveHighlight(root, work, { annotationComplete = true } = {}) {
+  copyProcessedHtml(root, work);
+  root[HIGHLIGHT] = root.innerHTML;
+  root[HIGHLIGHT_META] = { sourceHash: hashText(root[ORIGINAL]), annotationComplete };
+  discardWork(work);
 }
 
 export function showTranslation(root, targetLanguage) {
@@ -129,7 +149,7 @@ export function saveTranslation(root, work, targetLanguage, { annotationComplete
 }
 
 export function clearTargetCache(root) {
-  if ((root.innerHTML === root[LEARNING] || root.innerHTML === root[TRANSLATION]) && root[ORIGINAL] != null) {
+  if ((root.innerHTML === root[LEARNING] || root.innerHTML === root[TRANSLATION] || root.innerHTML === root[HIGHLIGHT]) && root[ORIGINAL] != null) {
     assignHtml(root, root[ORIGINAL]);
   }
   delete root[ORIGINAL];
@@ -137,6 +157,8 @@ export function clearTargetCache(root) {
   delete root[CACHE_META];
   delete root[TRANSLATION];
   delete root[TRANSLATION_META];
+  delete root[HIGHLIGHT];
+  delete root[HIGHLIGHT_META];
 }
 
 export function readStoredPageCache(store, href) {

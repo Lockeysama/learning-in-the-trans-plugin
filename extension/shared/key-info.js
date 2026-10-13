@@ -139,7 +139,7 @@ export function keyInfoRanges(source, annotated) {
       }
       index += 2;
     } else {
-      if (cursor >= source.length || annotated[index] !== source[cursor]) throw new Error("重点标注改动了译文");
+      if (cursor >= source.length || annotated[index] !== source[cursor]) throw new Error("重点标注改动了正文");
       cursor += 1;
       index += 1;
     }

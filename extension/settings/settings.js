@@ -63,7 +63,7 @@ function saveKeyInfoStyle(style) {
       const result = await chrome.runtime.sendMessage({ type: "SAVE_KEY_INFO_STYLE", keyInfoStyle: style });
       if (result?.error) throw new Error(result.error);
       keyInfoStatus.className = "status";
-      keyInfoStatus.textContent = "已保存，打开中的全文译文已生效";
+      keyInfoStatus.textContent = "已保存，打开中的重点标记已生效";
     } catch (error) {
       keyInfoStatus.className = "status error";
       keyInfoStatus.textContent = error.message || "保存失败，请重试";

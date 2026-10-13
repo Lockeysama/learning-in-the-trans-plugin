@@ -110,11 +110,12 @@ textarea { min-height: 72px; resize: vertical; }
 }
 
 .switch {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   margin: 4px 0 8px;
   padding: 3px;
   background: #e7e0d4;
-  border-radius: 999px;
+  border-radius: 16px;
 }
 
 .switch-btn {

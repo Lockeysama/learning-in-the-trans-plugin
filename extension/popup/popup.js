@@ -11,6 +11,7 @@ const autoLearn = document.getElementById("autoLearn");
 const originalBtn = document.getElementById("original");
 const learnBtn = document.getElementById("learn");
 const translateBtn = document.getElementById("translate");
+const highlightBtn = document.getElementById("highlight");
 let viewRequest = 0;
 
 let refreshToken = 0;
@@ -52,6 +53,7 @@ function setViewSwitch(mode) {
   originalBtn.setAttribute("aria-pressed", String(mode === "original"));
   learnBtn.setAttribute("aria-pressed", String(mode === "learning"));
   translateBtn.setAttribute("aria-pressed", String(mode === "translated"));
+  highlightBtn.setAttribute("aria-pressed", String(mode === "highlighted"));
 }
 
 function applyAutoLearn(host, state) {
@@ -178,6 +180,7 @@ async function chooseView(mode, type) {
 
 learnBtn.onclick = () => chooseView("learning", "PROCESS_PAGE");
 translateBtn.onclick = () => chooseView("translated", "TRANSLATE_PAGE");
+highlightBtn.onclick = () => chooseView("highlighted", "HIGHLIGHT_PAGE");
 originalBtn.onclick = () => chooseView("original", "RESTORE_PAGE");
 
 document.getElementById("clearCache").onclick = async () => {

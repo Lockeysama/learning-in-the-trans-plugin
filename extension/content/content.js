@@ -20,6 +20,8 @@ import {
   showLearning,
   showTranslation,
   saveTranslation,
+  showHighlight,
+  saveHighlight,
   sourceHtml,
   workingCopy,
   pageViewId,
@@ -37,9 +39,10 @@ import { BATCH_MAX_CHARS, BATCH_MAX_ITEMS, FRAGMENT_MAX_CHARS, packBatches, spli
 import { explainRuntimeError, isStaleExtensionError, sendRuntime } from "../shared/messages.js";
 import { shouldAutoLearnPage } from "../shared/site.js";
 import { mountSelector } from "./select.js";
-import { mountToolbar, setToolbar } from "./toolbar.js";
+import { mountToolbar, setToolbar, clearProcessingNotice, showProcessingNotice } from "./toolbar.js";
 import { translateFullText } from "./full-translation.js";
 import { applyKeyInfoStyle } from "./key-info-style.js";
+import { highlightKeyInfo } from "./key-info.js";
 
 const alreadyLoaded = Boolean(globalThis.__littpLoaded);
 globalThis.__littpLoaded = true;
@@ -234,6 +237,7 @@ async function processTarget(target, state, { force = false, lexiconKey, view = 
   refreshSource(target, mode !== "original");
   if (!force) {
     if (view === "translated") return { cached: showTranslation(target, targetLanguage) };
+    if (view === "highlighted") return { cached: showHighlight(target) };
     hydrateTarget(target, lexiconKey);
     if (cacheFits(target, { lexiconKey, viewingLearning: mode !== "original" }) && applyLearningView(target, lexiconKey)) {
       return { cached: true };
@@ -255,7 +259,21 @@ async function processTarget(target, state, { force = false, lexiconKey, view = 
       });
       checkCurrent?.();
       saveTranslation(target, work, targetLanguage, annotation);
-      return { cached: false };
+      return { cached: false, ...annotation };
+    }
+    if (view === "highlighted") {
+      const annotation = await highlightKeyInfo(work, sendRuntime, {
+        checkCurrent,
+        concurrency: state.translationConcurrency?.annotation,
+        onUpdate: () => {
+          checkCurrent?.();
+          copyProcessedHtml(target, work);
+          updateBar({ status: "正在标记重点…" });
+        },
+      });
+      checkCurrent?.();
+      saveHighlight(target, work, annotation);
+      return { cached: false, ...annotation };
     }
     const lang = detectLang(work.textContent || work.innerText || "");
     log("process", { lang, host: currentHost(), known: state.knownLemmas?.length });
@@ -273,7 +291,6 @@ async function processTarget(target, state, { force = false, lexiconKey, view = 
   } catch (error) {
     discardWork(work);
     checkCurrent?.();
-    if (hasOriginal(target)) restore(target);
     throw error;
   }
   return { cached: false };
@@ -319,7 +336,7 @@ async function processPageNow({ force = false, wait = false, view = "learning", 
     // this status is worth showing even though `processing` has not flipped yet.
     updateBar({
       mode,
-      status: wait ? (view === "translated" ? "正在进入全文翻译…" : "正在进入学习视图…") : "正在等待邮件正文…",
+      status: wait ? (view === "translated" ? "正在进入全文翻译…" : view === "highlighted" ? "正在进入重点标记…" : "正在进入学习视图…") : "正在等待邮件正文…",
       visible: !barDismissed,
     });
     const waited = await waitForTargets(wait ? 6000 : 4000, { minText: wait ? 80 : 0 });
@@ -361,6 +378,7 @@ async function processPageNow({ force = false, wait = false, view = "learning", 
   mountUi();
   try {
     let usedCache = true;
+    let annotationError = "";
     let state = light;
     if (force) {
       usedCache = false;
@@ -377,40 +395,52 @@ async function processPageNow({ force = false, wait = false, view = "learning", 
       updateBar({ mode, status: "处理中…" });
       if (view === "learning" && state === light) state = await getStateWithRetry();
       if (!stillThisPage()) return { skipped: true };
-      await processTarget(target, state, { force: true, lexiconKey, view, targetLanguage, checkCurrent });
+      const result = await processTarget(target, state, { force: true, lexiconKey, view, targetLanguage, checkCurrent });
+      if (result.annotationComplete === false) annotationError ||= result.annotationError || "重点标记失败";
     }
     if (!stillThisPage()) return { skipped: true };
     root = targets[0];
     mode = view;
-    updateBar({ mode, status: view === "translated" ? (targetLanguage === "zh" ? "全文 · 中文" : "全文 · 英文") : "学习视图" });
+    if (annotationError) return reportProcessingError(new Error(annotationError), view, { annotation: true });
+    updateBar({ mode, status: view === "translated" ? (targetLanguage === "zh" ? "全文 · 中文" : "全文 · 英文") : view === "highlighted" ? "重点标记" : "学习视图" });
     return { ok: true, mode, cached: usedCache };
   } catch (error) {
     if (!stillThisPage()) return { skipped: true };
-    showOriginal();
-    mode = "original";
-    barError = true;
-    updateBar({ mode, status: "处理失败，已回原文" });
     log("failed", error?.message || error);
     if (debugEnabled) console.warn("Littp failed", error);
-    return { error: error.message || "failed" };
+    return reportProcessingError(error, view);
   }
+}
+
+function reportProcessingError(error, view, { annotation = false, retainMode = false } = {}) {
+  if (!retainMode) mode = view;
+  barError = true;
+  barDismissed = false;
+  const reason = explainRuntimeError(error);
+  const action = view === "highlighted" || annotation ? "重点标记" : view === "translated" ? "全文翻译" : "学习视图";
+  const message = `${action}未完成：${reason}。已保留当前内容，可点击重试或再次选择${action === "重点标记" && view === "translated" ? "全文翻译" : action}。`;
+  mountUi();
+  showProcessingNotice(message, () => processPage({ view }));
+  updateBar({ mode, status: `${action}未完成，可重试` });
+  return { error: message, mode };
 }
 
 function processPage(opts = {}) {
   const view = opts.view || "learning";
   if (processWait && pendingView === view) return processWait;
+  // Rebuild a failed view from its source; successful model batches still reuse
+  // their background cache, even if an older complete DOM view was saved.
+  const force = Boolean(opts.force || (barError && mode === view));
   if (processWait) showOriginal();
   const epoch = ++viewEpoch;
   pendingView = view;
   barError = false;
+  clearProcessingNotice();
   clearTimeout(reprocessTimer);
   suppressAutoLearn = true;
-  const pending = processPageNow({ ...opts, view, epoch }).catch(error => {
+  const pending = processPageNow({ ...opts, force, view, epoch }).catch(error => {
     if (epoch !== viewEpoch) return { skipped: true };
-    showOriginal();
-    barError = true;
-    updateBar({ status: explainRuntimeError(error) });
-    return { error: explainRuntimeError(error), mode };
+    return reportProcessingError(error, view, { retainMode: true });
   }).finally(() => {
     if (processWait !== pending) return;
     processWait = null;
@@ -433,6 +463,7 @@ function cancelProcessing() {
 
 function showOriginal({ persist = false } = {}) {
   cancelProcessing();
+  clearProcessingNotice();
   for (const target of connectedTargets()) {
     if (hasOriginal(target)) restore(target);
   }
@@ -505,6 +536,7 @@ function mountUi() {
       processPage({ force: false });
     },
     onTranslate: () => processPage({ view: "translated" }),
+    onHighlight: () => processPage({ view: "highlighted" }),
     onHide: hideBar,
   });
 }
@@ -523,6 +555,7 @@ function resetForNewPage() {
   tracked = [];
   root = null;
   mode = "original";
+  clearProcessingNotice();
   if (window === window.top) {
     mountUi();
     updateBar({ mode: "original", status: "原文" });
@@ -631,12 +664,12 @@ async function bootAutoLearn() {
 
 async function handleMessage(message) {
   if (message?.type === "PING") return { ok: true, mode };
-  if (message?.type === "PROCESS_PAGE" || message?.type === "TRANSLATE_PAGE") {
+  if (message?.type === "PROCESS_PAGE" || message?.type === "TRANSLATE_PAGE" || message?.type === "HIGHLIGHT_PAGE") {
     // An explicit activation (popup button or context menu) brings the bar back even
     // if the reader hid it earlier; auto-learn does not, so it stays out of the way.
     barDismissed = false;
     return processPage({
-      view: message.type === "TRANSLATE_PAGE" ? "translated" : "learning",
+      view: message.type === "TRANSLATE_PAGE" ? "translated" : message.type === "HIGHLIGHT_PAGE" ? "highlighted" : "learning",
       force: Boolean(message.force),
       wait: Boolean(message.wait),
     });
