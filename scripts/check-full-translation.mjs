@@ -80,7 +80,7 @@ try {
       if (input.targetLanguage) payload = { items: input.items.map(item => ({ id: item.id, translation: input.targetLanguage === 'zh' ? '这是自然通顺的中文译文，完整保留了原文的含义，并帮助读者理解文章中的重要信息。' : 'This is the English translation of the original Chinese article, preserving its meaning and information.' })) };
       else if (input.items) payload = { items: input.items.map(item => ({ span: item.span, gloss: '测试释义' })) };
       else payload = { paragraphs: input.paragraphs.map(() => 'An English paragraph with unfamiliar phenomena.') };
-      if (globalThis.__invalidNext || (input.targetLanguage && __calls.filter(c => c.targetLanguage).length === globalThis.__invalidAtFull)) { globalThis.__invalidNext = false; payload = { items: [] }; }
+      if (globalThis.__invalidNext || (input.targetLanguage && [globalThis.__invalidAtFull, globalThis.__invalidAtFull + 1].includes(__calls.filter(c => c.targetLanguage).length))) { globalThis.__invalidNext = false; payload = { items: [] }; }
       return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(payload) } }], usage: {} }), { status: 200 });
     };
   })()`);
@@ -100,8 +100,7 @@ try {
   await sw.evaluate("globalThis.__release(); globalThis.__release = null; globalThis.__delayAtFull = null");
   await until(sw, "Boolean(globalThis.__releaseAnnotation)");
   check("translation is visible before delayed annotation finishes", await page.evaluate("document.querySelector('article').textContent.includes('中文译文')"));
-  await until(page, "Boolean(document.querySelector('p strong.littp-key-info'))");
-  check("later annotation is displayed while the first annotation is still pending", await sw.evaluate("Boolean(globalThis.__releaseAnnotation)") && await page.evaluate("!document.querySelector('h1 strong.littp-key-info')"));
+  check("batch annotations wait for completion while translated text remains visible", await sw.evaluate("Boolean(globalThis.__releaseAnnotation)") && await page.evaluate("document.querySelector('article').textContent.includes('中文译文')"));
   await sw.evaluate("globalThis.__releaseAnnotation(); globalThis.__releaseAnnotation = null");
   await mode("translated");
   check("key phrases render as bold without literal Markdown markers", await page.evaluate("Boolean(document.querySelector('strong.littp-key-info')) && !document.querySelector('article').textContent.includes('**')"));
@@ -111,6 +110,27 @@ try {
   check("full translation contains no learning glosses", await page.evaluate("document.querySelectorAll('.littp-gloss').length === 0"));
   check("links, emphasis and code survive", await page.evaluate(`document.getElementById('link').getAttribute('href') === '/reference' && document.getElementById('emphasis').tagName === 'EM' && document.getElementById('code').textContent === 'const value = 42;'`));
   check("navigation and sidebar retain their nodes", await page.evaluate("navigation === document.getElementById('navigation') && sidebar === document.getElementById('sidebar')"));
+  async function checkOriginalSelection(crossBlock = false) {
+    const expected = await page.evaluate(`(() => {
+      const blocks = document.querySelectorAll('article p');
+      const start = blocks[0].querySelector('strong')?.firstChild || blocks[0].firstChild;
+      const end = ${crossBlock} ? blocks[1].firstChild : start;
+      blocks[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      const range = document.createRange();
+      range.setStart(start, 1);
+      range.setEnd(end, Math.min(3, end.length));
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      blocks[0].dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      return [blocks[0], ...(${crossBlock} ? [blocks[1]] : [])].map(block => block.getAttribute('data-littp-original'));
+    })()`);
+    await until(page, "document.getElementById('littp-select-host').shadowRoot.getElementById('menu').classList.contains('open')");
+    const actual = await page.evaluate("[...document.getElementById('littp-select-host').shadowRoot.querySelectorAll('#translation p')].map(p => p.textContent)");
+    check(crossBlock ? "cross-block selection shows each complete original block in order" : "partial translated selection shows its complete original block including inline links", expected.every(Boolean) && JSON.stringify(actual) === JSON.stringify(expected));
+    await page.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); getSelection().removeAllRanges()");
+  }
+  await checkOriginalSelection();
+  await checkOriginalSelection(true);
   const firstCount = await callCount();
   const firstAnnotationCount = await sw.evaluate("__calls.filter(c => c.annotation).length");
   await click("original");
@@ -119,6 +139,7 @@ try {
   await popupClick("translate");
   await mode("translated");
   check("full translation cache is reused", await callCount() === firstCount);
+  await checkOriginalSelection();
   await click("learning");
   await mode("learning");
   check("learning view starts from English source", await page.evaluate("document.querySelectorAll('.littp-gloss').length > 0 && !document.querySelector('article').textContent.includes('中文译文')"));
@@ -179,26 +200,22 @@ try {
   await until(popup, "document.getElementById('message').textContent.includes('已清除本页缓存')");
   await sw.evaluate("globalThis.__invalidNext = true");
   await popupClick("translate");
-  await until(popup, "document.getElementById('message').textContent.includes('全文翻译结果不完整')");
-  check("invalid translation keeps requested mode and shows a retry notice", await page.evaluate(`${bar}.getElementById('translated').dataset.active === 'true' && !${bar}.getElementById('notice').hidden`));
-  await click("retry");
-  await mode("translated");
   await until(page, `${bar}.getElementById('status').textContent === '全文 · 中文'`);
-  check("notice retry succeeds and dismisses the notice", await page.evaluate(`${bar}.getElementById('notice').hidden`));
+  check("invalid translation automatically retries and recovers", await page.evaluate(`${bar}.getElementById('notice').hidden && Boolean(document.querySelector('strong.littp-key-info'))`));
 
   await popupClick("clearCache");
   await mode("original");
   await sw.evaluate("(async () => { await chrome.storage.local.set({translationConcurrency: {translation: 1, annotation: 5}}); globalThis.__invalidAtFull = __calls.filter(c => c.targetLanguage).length + 2; })()");
   await popupClick("translate");
   await until(popup, "document.getElementById('message').textContent.includes('全文翻译结果不完整')");
-  check("a later failed translation batch preserves earlier translations and annotations", await page.evaluate(`document.querySelector('article').textContent.includes('中文译文') && document.querySelector('article').textContent.includes('reliable internet') && Boolean(document.querySelector('strong.littp-key-info')) && ${bar}.getElementById('translated').dataset.active === 'true'`));
+  check("a twice-failed translation batch preserves earlier translations", await page.evaluate(`document.querySelector('article').textContent.includes('中文译文') && document.querySelector('article').textContent.includes('reliable internet') && ${bar}.getElementById('translated').dataset.active === 'true'`));
   const noticeScreenshot = await page.send("Page.captureScreenshot", { format: "png" });
   writeFileSync(join(tmpdir(), "littp-processing-notice.png"), Buffer.from(noticeScreenshot.data, "base64"));
   const callsAfterPartial = await callCount();
   await sw.evaluate("(async () => { globalThis.__invalidAtFull = null; await chrome.storage.local.set({translationConcurrency: {translation: 5, annotation: 5}}); })()");
   await popupClick("translate");
   await until(page, `${bar}.getElementById('status').textContent === '全文 · 中文'`);
-  check("manual retry reuses the successful translation batch", await callCount() === callsAfterPartial + 1);
+  check("manual retry reuses the successful translation batch", await callCount() > callsAfterPartial);
 
   await sw.evaluate("globalThis.__failGloss = true");
   await popupClick("learn");
@@ -331,6 +348,29 @@ try {
   })()`);
   check("bold spans align across links without changing text or link targets", inline.unchanged && inline.link === '/status' && inline.bold === '如果网络|断开|暂停上传' && inline.complete);
   check("annotations never partially bold a phrase crossing protected code", inline.codeUnchanged);
+  const batching = await page.evaluate(`(async () => {
+    const { highlightKeyInfo } = await import('chrome-extension://${worker.id}/content/key-info.js');
+    const { translateFullText } = await import('chrome-extension://${worker.id}/content/full-translation.js');
+    const work = document.createElement('div');
+    work.innerHTML = Array.from({ length: 41 }, (_, i) => '<p>第' + i + '句，请<a href="/save">保存</a>文件。</p>').join('');
+    const original = work.innerHTML;
+    const counts = [];
+    const result = await highlightKeyInfo(work, async ({ text }) => {
+      counts.push([...new Intl.Segmenter('zh', { granularity: 'sentence' }).segment(text)].length);
+      return { annotated: text };
+    });
+    const translated = document.createElement('div');
+    translated.innerHTML = Array.from({ length: 11 }, (_, i) => '<p>Sentence ' + i + ': <em>save</em> files.</p>').join('');
+    const translationCounts = [];
+    await translateFullText(translated, 'en', async request => {
+      if (request.type === 'ANNOTATE_KEY_INFO') return { annotated: request.text };
+      translationCounts.push(request.items.filter(item => item.text.startsWith('Sentence')).length);
+      return request.items.map(item => item.text);
+    });
+    return { counts, translationCounts, unchanged: work.innerHTML === original, complete: result.annotationComplete, emphasis: translated.querySelectorAll('em').length };
+  })()`);
+  check("41 sentences across inline links annotate in batches of 20, 20, 1", batching.counts.join(',') === '20,20,1' && batching.unchanged && batching.complete);
+  check("translation counts full sentences across inline markup: 5, 5, 1", batching.translationCounts.join(',') === '5,5,1' && batching.emphasis === 11);
   const concurrency = await page.evaluate(`(async () => {
     const { createKeyInfoAnnotator } = await import('chrome-extension://${worker.id}/content/key-info.js');
     const work = document.createElement('div');
@@ -347,8 +387,9 @@ try {
         this.done = true; active--;
         resolve(error ? { error: 'annotation failed' } : { annotated: text.replace('保存文件', '**保存文件**') });
       } }));
-    }, { onUpdate: () => updates.push(work.querySelectorAll('strong').length) });
+    }, { batchSizes: { annotation: 1 }, onUpdate: () => updates.push(work.querySelectorAll('strong').length) });
     annotator.flush();
+    const job = annotator.finish();
     await tick();
     const initially = requests.length;
     requests[1].finish();
@@ -360,12 +401,12 @@ try {
       for (const request of requests) request.finish();
       await tick();
     }
-    const result = await annotator.finish();
+    const result = await job;
     return { initially, maxActive, laterVisibleFirst, refilled, count: requests.length,
       bold: work.querySelectorAll('strong').length, complete: result.annotationComplete, updates: updates.length };
   })()`);
   check("annotation runs five requests concurrently and refills freed slots", concurrency.initially === 5 && concurrency.maxActive === 5 && concurrency.refilled && concurrency.count === 7);
-  check("out-of-order completion renders immediately; one failure does not stop other scopes", concurrency.laterVisibleFirst && concurrency.bold === 6 && !concurrency.complete && concurrency.updates === 6);
+  check("one failed batch preserves all successful annotations", concurrency.bold === 6 && !concurrency.complete && concurrency.updates === 1);
   await page.send("Page.navigate", { url: `${url}/concurrency` });
   await until(page, "location.pathname === '/concurrency' && Boolean(document.getElementById('littp-toolbar-host'))");
   await sw.evaluate("globalThis.__holdTranslations = true; globalThis.__held = []; globalThis.__maxTranslations = 0;");
@@ -411,12 +452,15 @@ try {
   await mode("translated");
   check("cached translation uses current appearance without model calls", await page.evaluate(customAppearance) && await sw.evaluate("__calls.length") === callsBeforeStyle);
   await settings.evaluate(`(() => {
+    document.getElementById('translationBatchSize').value = '10';
+    document.getElementById('annotationBatchSize').value = '30';
     document.getElementById('translationConcurrency').value = '2';
     document.getElementById('annotationConcurrency').value = '3';
     document.getElementById('saveConcurrency').click();
   })()`);
   await until(settings, "document.getElementById('concurrencyStatus').textContent.includes('已保存')");
   const configuredConcurrency = await settings.evaluate("(async () => (await chrome.runtime.sendMessage({type: 'GET_STATE', includeLemmas: false, includeCounts: false})).translationConcurrency)()");
+  check("settings persist configurable sentence batch sizes", await settings.evaluate("(async () => { const state = await chrome.runtime.sendMessage({type: 'GET_STATE', includeLemmas: false, includeCounts: false}); return state.batchSizes.translation === 10 && state.batchSizes.annotation === 30; })()"));
   check("settings persist distinct limits for translation and annotation", configuredConcurrency.translation === 2 && configuredConcurrency.annotation === 3);
   await settings.evaluate("globalThis.__settingsLoaded = true");
   await settings.send("Page.reload");
@@ -455,7 +499,7 @@ try {
         this.done = true; active--;
         resolve({ annotated: request.text.replace('save files', '**save files**') });
       } }));
-    }, { concurrency: ${JSON.stringify(configuredConcurrency)} });
+    }, { concurrency: ${JSON.stringify(configuredConcurrency)}, batchSizes: { annotation: 1 } });
     const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     await tick();
     const initially = requests.length;

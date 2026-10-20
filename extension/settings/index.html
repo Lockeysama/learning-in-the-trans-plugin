@@ -59,7 +59,7 @@
       </section>
 
       <section class="card">
-        <h2>翻译与重点标记并发</h2>
+        <h2>翻译与重点标记批次</h2>
         <p class="hint">每个页面分别限制翻译和重点标记的同时请求数，默认都是 5，可设为 1–10。重点标记并发也用于独立标记原文，保存后从下一轮处理开始生效。</p>
         <div class="appearance-grid">
           <div class="appearance-field">
@@ -71,8 +71,13 @@
             <input id="annotationConcurrency" type="number" min="1" max="10" step="1" value="5" required />
           </div>
         </div>
+        <div class="appearance-grid">
+          <div class="appearance-field"><label for="translationBatchSize">翻译每批句数</label><input id="translationBatchSize" type="number" min="1" max="50" step="1" value="5" required /></div>
+          <div class="appearance-field"><label for="annotationBatchSize">重点标记每批句数</label><input id="annotationBatchSize" type="number" min="1" max="50" step="1" value="20" required /></div>
+        </div>
+        <p class="hint">每批句数可设为 1–50，默认翻译 5 句、重点 20 句。末批不足也会处理；长文本可能提前分批。重点在全文翻译完成后统一分批判断，异常结果允许重试一次。</p>
         <div class="actions">
-          <button type="button" id="saveConcurrency">保存并发设置</button>
+          <button type="button" id="saveConcurrency">保存批次与并发设置</button>
           <button type="button" class="secondary" id="resetConcurrency">恢复默认</button>
         </div>
         <p class="status" id="concurrencyStatus" role="status"></p>

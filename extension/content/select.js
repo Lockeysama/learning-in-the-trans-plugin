@@ -143,7 +143,28 @@ export function selectionAnchor(selection, event) {
   const y = hasBox ? rect.top : event?.clientY;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
   const sentence = selectionContext(range, text);
-  return { text, draft, sentence, x, y };
+  return { text, draft, sentence, originalBlocks: selectionOriginalBlocks(range), x, y };
+}
+
+export function selectionOriginalBlocks(range) {
+  const common = range.commonAncestorContainer;
+  const root = common?.nodeType === 1 ? common : common?.parentElement;
+  if (!root) return [];
+  const blocks = new Set();
+  const add = (node) => {
+    if (!node.nodeValue || !range.intersectsNode(node)) return;
+    // intersectsNode includes text nodes touched only at a range boundary.
+    if (node === range.startContainer && range.startOffset === node.nodeValue.length) return;
+    if (node === range.endContainer && range.endOffset === 0) return;
+    const block = node.parentElement?.closest("[data-littp-original]");
+    if (block) blocks.add(block);
+  };
+  if (common.nodeType === 3) add(common);
+  else {
+    const walker = root.ownerDocument.createTreeWalker(root, 4);
+    while (walker.nextNode()) add(walker.currentNode);
+  }
+  return [...blocks].map(block => block.getAttribute("data-littp-original"));
 }
 
 // Use the range's document-order start (also for backwards selections), including
@@ -224,10 +245,16 @@ export function mountSelector({ onAddDraft, onAddKnown, onPronounce, onTranslate
     dot.setAttribute("aria-expanded", "false");
     pinned = false;
     current = { text: anchor.text, draft: anchor.draft, sentence: anchor.sentence || "" };
+    if (anchor.originalBlocks?.length) {
+      translation.hidden = false;
+      appendText(translation, "div", "原文", "label");
+      for (const text of anchor.originalBlocks) appendText(translation, "p", text);
+    }
     for (const id of ["addDraft", "addKnown", "pronounce"]) root.getElementById(id).disabled = !anchor.draft;
     wrap.hidden = false;
     wrap.style.left = `${Math.min(window.innerWidth - 28, Math.max(8, anchor.x + 6))}px`;
     wrap.style.top = `${Math.min(window.innerHeight - 28, Math.max(8, anchor.y - 6))}px`;
+    if (anchor.originalBlocks?.length) openMenu();
   }
 
   function showDot(event, snapshot) {

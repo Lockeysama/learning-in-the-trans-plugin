@@ -1,4 +1,6 @@
-import { KEY_INFO_MAX_CHARS, keyInfoRanges, keyInfoSegments } from "../shared/key-info.js";
+import { KEY_INFO_MAX_CHARS, keyInfoRanges } from "../shared/key-info.js";
+import { sentenceBatches } from "../shared/chunks.js";
+import { normalizeBatchSizes } from "../shared/translation-settings.js";
 import { isInsideChrome } from "./extract.js";
 import { normalizeTranslationConcurrency } from "../shared/translation-settings.js";
 
@@ -54,7 +56,7 @@ function applyRanges(scope, ranges) {
   }
 }
 
-export function createKeyInfoAnnotator(work, groups, request, { checkCurrent, onUpdate, concurrency } = {}) {
+export function createKeyInfoAnnotator(work, groups, request, { checkCurrent, onUpdate, concurrency, batchSizes } = {}) {
   const limit = normalizeTranslationConcurrency({ annotation: concurrency }).annotation;
   const byNode = new Map(groups.map(group => [group.node, group]));
   const scopes = [];
@@ -70,50 +72,51 @@ export function createKeyInfoAnnotator(work, groups, request, { checkCurrent, on
     scope.nodes.push(node);
     if (byNode.has(node)) scope.groups.push(byNode.get(node));
   }
-  const waiting = [];
-  const active = new Set();
-  let failures = 0;
-  let annotationError = "";
-  async function annotate(scope) {
-    checkCurrent?.();
-    const text = scope.nodes.map(node => node.nodeValue).join("");
-    const ranges = [];
-    for (const segment of keyInfoSegments(text)) {
-      checkCurrent?.();
-      if (!segment.text.trim() || segment.text.length > KEY_INFO_MAX_CHARS) continue;
-      const result = await request({ type: "ANNOTATE_KEY_INFO", text: segment.text });
-      checkCurrent?.();
-      if (result?.error) throw new Error(result.error);
-      ranges.push(...keyInfoRanges(segment.text, result?.annotated).map(range => ({
-        start: range.start + segment.offset, end: range.end + segment.offset,
-      })));
-    }
-    applyRanges(scope, ranges);
-    onUpdate?.();
-  }
-  function pump() {
-    while (waiting.length && active.size < limit) {
-      const scope = waiting.shift();
-      const job = Promise.resolve().then(() => annotate(scope))
-        .catch(error => { failures += 1; annotationError ||= error.message || "重点标记失败"; })
-        .finally(() => { active.delete(job); pump(); });
-      active.add(job);
-    }
-  }
+  let finished = false;
   return {
-    flush() {
-      for (const scope of scopes) {
-        if (scope.queued || !scope.groups.length || scope.groups.some(group => group.pending) || isInsideChrome(scope.owner)) continue;
-        scope.queued = true;
-        waiting.push(scope);
-      }
-      // Ready scopes run concurrently with one another and with translation.
-      // Apply each result immediately; a slow scope does not hold up later ones.
-      pump();
-    },
+    // Collect the full ordered text before batching, including translated scopes.
+    flush() {},
     async finish() {
-      while (active.size) await Promise.all([...active]);
+      if (finished) throw new Error("重点标记已经完成");
+      finished = true;
       checkCurrent?.();
+      let text = "";
+      const selected = scopes.filter(scope => scope.groups.length && !isInsideChrome(scope.owner));
+      for (const scope of selected) {
+        if (text) text += "\n";
+        scope.offset = text.length;
+        scope.text = scope.nodes.map(node => node.nodeValue).join("");
+        text += scope.text;
+      }
+      const batches = sentenceBatches(text, normalizeBatchSizes(batchSizes).annotation, KEY_INFO_MAX_CHARS);
+      const ranges = [];
+      let next = 0, failures = 0, annotationError = "";
+      async function worker() {
+        while (next < batches.length) {
+          const segment = batches[next++];
+          try {
+            checkCurrent?.();
+            if (!segment.text.trim()) continue;
+            if (segment.text.length > KEY_INFO_MAX_CHARS) throw new Error("单句过长，无法标记重点");
+            const result = await request({ type: "ANNOTATE_KEY_INFO", text: segment.text });
+            checkCurrent?.();
+            if (result?.error) throw new Error(result.error);
+            ranges.push(...keyInfoRanges(segment.text, result?.annotated).map(range => ({
+              start: range.start + segment.offset, end: range.end + segment.offset,
+            })));
+          } catch (error) { failures++; annotationError ||= error.message || "重点标记失败"; }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(limit, batches.length) }, worker));
+      checkCurrent?.();
+      ranges.sort((a, b) => a.start - b.start);
+      for (const scope of selected) {
+        try {
+          applyRanges(scope, ranges.filter(range => range.start < scope.offset + scope.text.length && range.end > scope.offset)
+            .map(range => ({ start: Math.max(0, range.start - scope.offset), end: Math.min(scope.text.length, range.end - scope.offset) })));
+        } catch (error) { failures++; annotationError ||= error.message; }
+      }
+      onUpdate?.();
       return { annotationComplete: failures === 0, annotationError };
     },
   };

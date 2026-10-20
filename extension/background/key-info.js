@@ -1,3 +1,4 @@
+import { withOneRetry } from "../shared/model-retry.js";
 import { keyInfoRanges, keyInfoRevisionReason, keyInfoRelationGaps, keyInfoCoverage, restoreKeyInfoSource, completeKeyInfoRelations } from "../shared/key-info.js";
 
 export const KEY_INFO_REVISION = `
@@ -33,10 +34,12 @@ export function keyInfoRequest(text, prompt, reason = "", previousAnnotation = "
 // The second request uses the same worker slot and is only needed for a
 // suspect result. Failure must not discard an otherwise valid first result.
 export async function annotateWithReview(text, request) {
-  let first = await request("");
+  let attempts = 0;
+  let first = await withOneRetry(() => { attempts++; return request(""); });
   try { first = completeKeyInfoRelations(text, restoreKeyInfoSource(text, first)); } catch { /* semantic revision required */ }
   const reason = keyInfoRevisionReason(text, first);
   if (!reason) return first;
+  if (attempts === 2) { keyInfoRanges(text, first); return first; }
   let firstRanges;
   try { firstRanges = keyInfoRanges(text, first); } catch { /* retry malformed output */ }
   try {

@@ -27,3 +27,10 @@ export function normalizeKeyInfoStyle(raw) {
     backgroundColor: color(raw?.backgroundColor, DEFAULT_KEY_INFO_STYLE.backgroundColor),
   };
 }
+
+export const DEFAULT_BATCH_SIZES = Object.freeze({ translation: 5, annotation: 20 });
+export function normalizeBatchSizes(raw) {
+  const size = (value, fallback) => value === "" || value == null || typeof value === "boolean" || !Number.isFinite(Number(value))
+    ? fallback : Math.min(50, Math.max(1, Math.round(Number(value))));
+  return { translation: size(raw?.translation, 5), annotation: size(raw?.annotation, 20) };
+}

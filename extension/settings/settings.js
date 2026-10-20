@@ -3,7 +3,7 @@ import { DEFAULT_GLOSS_STYLE, normalizeGlossStyle } from "../shared/gloss-style.
 import { formatTokens } from "../shared/usage.js";
 import { validatePrompts } from "../shared/prompts.js";
 import { applyKeyInfoStyle } from "../content/key-info-style.js";
-import { DEFAULT_KEY_INFO_STYLE, DEFAULT_TRANSLATION_CONCURRENCY, normalizeKeyInfoStyle, normalizeTranslationConcurrency } from "../shared/translation-settings.js";
+import { DEFAULT_BATCH_SIZES, normalizeBatchSizes, DEFAULT_KEY_INFO_STYLE, DEFAULT_TRANSLATION_CONCURRENCY, normalizeKeyInfoStyle, normalizeTranslationConcurrency } from "../shared/translation-settings.js";
 
 const apiKey = document.getElementById("apiKey");
 const keyStatus = document.getElementById("keyStatus");
@@ -18,6 +18,13 @@ let promptDefaults = {};
 let glossSaveTimer = 0;
 const translationConcurrency = document.getElementById("translationConcurrency");
 const annotationConcurrency = document.getElementById("annotationConcurrency");
+const translationBatchSize = document.getElementById("translationBatchSize");
+const annotationBatchSize = document.getElementById("annotationBatchSize");
+function paintBatchSizes(raw) {
+  const sizes = normalizeBatchSizes(raw);
+  translationBatchSize.value = sizes.translation;
+  annotationBatchSize.value = sizes.annotation;
+}
 const concurrencyStatus = document.getElementById("concurrencyStatus");
 const keyInfoBold = document.getElementById("keyInfoBold");
 const keyInfoColor = document.getElementById("keyInfoColor");
@@ -33,11 +40,12 @@ function paintConcurrency(raw) {
   annotationConcurrency.value = next.annotation;
 }
 
-async function saveConcurrency(value) {
+async function saveConcurrency(value, batchSizes = { translation: translationBatchSize.valueAsNumber, annotation: annotationBatchSize.valueAsNumber }) {
   try {
-    const result = await chrome.runtime.sendMessage({ type: "SAVE_TRANSLATION_CONCURRENCY", translationConcurrency: value });
+    const result = await chrome.runtime.sendMessage({ type: "SAVE_TRANSLATION_CONCURRENCY", translationConcurrency: value, batchSizes });
     if (result?.error) throw new Error(result.error);
     paintConcurrency(result.translationConcurrency);
+    paintBatchSizes(result.batchSizes);
     concurrencyStatus.className = "status";
     concurrencyStatus.textContent = "已保存，下一轮全文翻译生效";
   } catch (error) {
@@ -176,12 +184,13 @@ function renderUsage(usage = {}) {
 async function refresh() {
   const [stats, stored, promptData] = await Promise.all([
     chrome.runtime.sendMessage({ type: "GET_STATS" }),
-    chrome.storage.local.get(["apiKey", "glossStyle", "translationConcurrency", "keyInfoStyle"]),
+    chrome.storage.local.get(["apiKey", "glossStyle", "translationConcurrency", "batchSizes", "keyInfoStyle"]),
     chrome.runtime.sendMessage({ type: "GET_PROMPTS" }),
   ]);
   if (stored.apiKey) apiKey.value = stored.apiKey;
   paintGlossStyle(stored.glossStyle);
   paintConcurrency(stored.translationConcurrency);
+  paintBatchSizes(stored.batchSizes);
   paintKeyInfoStyle(stored.keyInfoStyle);
   renderUsage(stats.usage || {});
   if (promptData?.prompts) {
@@ -205,10 +214,10 @@ glossSize.addEventListener("input", scheduleGlossSave);
 glossColor.addEventListener("input", scheduleGlossSave);
 
 document.getElementById("saveConcurrency").onclick = () => {
-  if (!translationConcurrency.reportValidity() || !annotationConcurrency.reportValidity()) return;
+  if (!translationConcurrency.reportValidity() || !annotationConcurrency.reportValidity() || !translationBatchSize.reportValidity() || !annotationBatchSize.reportValidity()) return;
   saveConcurrency({ translation: translationConcurrency.valueAsNumber, annotation: annotationConcurrency.valueAsNumber });
 };
-document.getElementById("resetConcurrency").onclick = () => saveConcurrency(DEFAULT_TRANSLATION_CONCURRENCY);
+document.getElementById("resetConcurrency").onclick = () => saveConcurrency(DEFAULT_TRANSLATION_CONCURRENCY, DEFAULT_BATCH_SIZES);
 for (const input of [keyInfoBold, keyInfoColor, keyInfoNoBackground, keyInfoBackground]) {
   input.addEventListener("input", scheduleKeyInfoSave);
 }

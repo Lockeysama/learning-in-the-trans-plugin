@@ -251,6 +251,7 @@ async function processTarget(target, state, { force = false, lexiconKey, view = 
       const annotation = await translateFullText(work, targetLanguage, sendRuntime, {
         checkCurrent,
         concurrency: state.translationConcurrency,
+        batchSizes: state.batchSizes,
         onBatch: (done, total, stage) => {
           checkCurrent?.();
           copyProcessedHtml(target, work);
@@ -265,6 +266,7 @@ async function processTarget(target, state, { force = false, lexiconKey, view = 
       const annotation = await highlightKeyInfo(work, sendRuntime, {
         checkCurrent,
         concurrency: state.translationConcurrency?.annotation,
+        batchSizes: state.batchSizes,
         onUpdate: () => {
           checkCurrent?.();
           copyProcessedHtml(target, work);

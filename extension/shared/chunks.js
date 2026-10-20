@@ -66,3 +66,21 @@ export function packBatches(items, {
   flush();
   return batches;
 }
+
+// Newlines also delimit headings and list items; preserve every source character.
+export function sentenceParts(text) {
+  const result = [];
+  let offset = 0;
+  for (const line of String(text).split(/(?<=\n)/u)) {
+    for (const part of new Intl.Segmenter(undefined, { granularity: "sentence" }).segment(line)) {
+      result.push({ text: part.segment, offset: offset + part.index });
+    }
+    offset += line.length;
+  }
+  return result;
+}
+
+export function sentenceBatches(text, maxSentences, maxChars) {
+  return packBatches(sentenceParts(text), { maxItems: maxSentences, maxChars, textOf: part => part.text })
+    .map(parts => ({ text: parts.map(part => part.text).join(""), offset: parts[0].offset }));
+}
